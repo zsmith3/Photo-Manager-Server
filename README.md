@@ -27,7 +27,7 @@ NOTE: these instructions haven't been tested and are probably missing something.
 		"rest_framework.authtoken",
 		...
 	]
-	
+
 	REST_FRAMEWORK = {
 		"DEFAULT_RENDERER_CLASSES": (
 			"rest_framework.renderers.JSONRenderer",
@@ -49,4 +49,5 @@ NOTE: these instructions haven't been tested and are probably missing something.
 	```
 3) Create a new app (e.g. "fileserver") and paste all files from this branch into the new app
 4) Add fileserver.urls to the main project urls file
-5) See instructions in the web branch to host the static client-side files as well
+5) See instructions in the web branch to host the static client-side files
+	- Add Django to static server through WSGI (see [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for Apache instructions)
