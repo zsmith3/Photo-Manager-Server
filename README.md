@@ -1,34 +1,52 @@
-# Remote Photo Management System
+# Remote Photo Management System - Server branch
 
-This project is a work in progress. It's probably not ready for any practical use yet.
+This branch contains Django-based code for hosting the server-side API. For more details on this project see the master branch README.
 
-It has two main goals:
-- To provide a powerful photo management system (like, for example, Picasa)
-- To allow for connection to a self-hosted file server
-- To be open source
+## Installation
 
-Example use case: I want to be able to remotely synchronise the photos on my phone and my computer, and organise them on either one. But, I don't want the cost/privacy issues of uploading to a third-party site.
+NOTE: these instructions haven't been tested and are probably missing something.
 
-## Branches
+1) Install:
+	- [Django](https://www.djangoproject.com/)
+	- [Django Rest Framework](http://www.django-rest-framework.org/)
+		- [JSON WebToken Authentication for DRF](http://getblimp.github.io/django-rest-framework-jwt/)
+		- [MessagePack for DRF](https://github.com/juanriaza/django-rest-framework-msgpack)
+		- [QueryFields for DRF](https://github.com/wimglenn/djangorestframework-queryfields)
+	- [OpenCV-Python](https://pypi.org/project/opencv-python/)
+	- [OpenCV-Contrib-Python](https://pypi.org/project/opencv-contrib-python/)
+	- [Pillow](https://python-pillow.org/) or [Pillow-SIMD](https://github.com/uploadcare/pillow-simd)
+	- [ExifRead](https://pypi.org/project/ExifRead/)
+	- [Mutagen](https://github.com/quodlibet/mutagen)
+	- [Numpy](http://www.numpy.org/)
+	- [Piexif](https://pypi.org/project/piexif/)
+2) Create a new project and add the following settings:
+	```python
+	INSTALLED_APPS = [
+		"fileserver.apps.FileserverConfig",
+		"rest_framework",
+		"rest_framework.authtoken",
+		...
+	]
+	
+	REST_FRAMEWORK = {
+		"DEFAULT_RENDERER_CLASSES": (
+			"rest_framework.renderers.JSONRenderer",
+			"rest_framework_msgpack.renderers.MessagePackRenderer",
+			"rest_framework.renderers.BrowsableAPIRenderer"
+		),
+		"DEFAULT_PARSER_CLASSES": (
+			"rest_framework.parsers.JSONParser",
+			"rest_framework_msgpack.parsers.MessagePackParser"
+		),
+		"DEFAULT_AUTHENTICATION_CLASSES": (
+			"rest_framework_jwt.authentication.JSONWebTokenAuthentication"
+		)
+	}
 
-- web: main web client
-- server: Django-based API
-- cordova: Cordova-based mobile app
-- electron: Electron-based desktop app
-
-## Features
-
-This is a list of all of the existing features, as well as some that I want to add.
-
-- TODO add existing features
-- [ ] JS Database class
-	- Should handle all interactions with the "database"
-    - On the web, this will be all API calls
-	- On other platforms it can be substituted for a local database
-	- Contain common methods, etc.
-	- Potentially a django-esque "models" system
-	- Add snackbar notifications for all database changes (i.e. "saving" and "saved")
-
-## Contributing
-
-Any contribution is welcomed and greatly appreciated, even if just in the form of suggestions/bug reports. See the list above for features to be added, and contact me to co-ordinate work.
+	JWT_AUTH = {
+		"JWT_EXPIRATION_DELTA": datetime.timedelta(365)
+	}
+	```
+3) Create a new app (e.g. "fileserver") and paste all files from this branch into the new app
+4) Add fileserver.urls to the main project urls file
+5) See instructions in the web branch to host the static client-side files as well
