@@ -1,14 +1,11 @@
-from rest_framework import generics, status, views, viewsets, response  # renderers
-from rest_framework import request as requests
-# from rest_framework_msgpack.renderers import MessagePackRenderer
+from rest_framework import status, viewsets, response
 from django import http
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 
 from PIL import Image
 import cv2
-import exifread
+# import exifread
 import os
-import math
 import piexif
 
 from . import models
