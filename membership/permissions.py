@@ -20,10 +20,10 @@ class FileserverPermission(permissions.BasePermission):
             else:
                 user = auth[0]
 
-            if models.AuthGroup.user_is_admin(user):
+        if models.AuthGroup.user_is_admin(user):
+            return True
+        elif models.AuthGroup.user_is_auth(user):
+            if request.method in permissions.SAFE_METHODS:
                 return True
-            elif models.AuthGroup.user_is_auth(user):
-                if request.method in permissions.SAFE_METHODS:
-                    return True
 
         return False
