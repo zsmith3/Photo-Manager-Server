@@ -75,10 +75,10 @@ serializers.ModelSerializer.apply_filters = apply_filters
 
 # Sort files
 def sort_files(self, files):
-    files.sort(key=lambda file: file.id)
+    files.sort(key=lambda file: utils._get_attr(file, "file_id") or file.id)
 
     # Sorting for faces
-    files.sort(key=lambda file: utils._get_attr(file, "file.id") or 0)
+    files.sort(key=lambda file: utils._get_attr(file, "file.file_id") or 0)
     files.sort(key=lambda file: utils._get_attr(file, "uncertainty") or 0)
     files.sort(key=lambda file: utils._get_attr(file, "status") or 0)
 
@@ -193,8 +193,9 @@ class FolderSerializer(RootFolderSerializer):
     def get_folders(self, obj):
         isf = (self.context["request"].query_params["isf"].lower() == "true") if "isf" in self.context["request"].query_params else False
         folders = self.extract_files(obj.get_children(isf), paginate=False)
-        serializer = FileSerializer(folders, many=True)
-        return serializer.data
+        return [folder.id for folder in folders]
+        """ serializer = FileSerializer(folders, many=True)
+        return serializer.data """
 
     def get_files(self, obj):
         isf = (self.context["request"].query_params["isf"].lower() == "true") if "isf" in self.context["request"].query_params else False
@@ -221,21 +222,21 @@ class BaseAlbumSerializer(serializers.ModelSerializer):
         return obj.get_file_count()
 
     class Meta:
-        fields = ("id", "name", "path", "file_count")
+        fields = ("id", "name", "file_count")  # "path",
 
 
 # Serializer for Album hierarchy
 class RootAlbumsSerializer(BaseAlbumSerializer):
-    children = serializers.SerializerMethodField()
+    """ children = serializers.SerializerMethodField()
 
     def get_children(self, obj):
         serializer = RootAlbumsSerializer(models.Album.objects.filter(parent=obj), many=True)
-        return serializer.data
+        return serializer.data """
 
     class Meta:
         model = models.Album
-        fields = BaseAlbumSerializer.Meta.fields + ("children", "parent")
-        extra_kwargs = {"parent": {"write_only": True}}
+        fields = BaseAlbumSerializer.Meta.fields + ("parent",)  # ("children", "parent")
+        # extra_kwargs = {"parent": {"write_only": True}}
 
 
 # Serializer for Album, with files

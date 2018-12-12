@@ -9,6 +9,7 @@ import os
 import piexif
 
 from . import models
+from . import filters
 from . import serializers
 from .membership import permissions
 
@@ -116,25 +117,32 @@ class FileViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.FileserverPermission,)
     serializer_class = serializers.FileSerializer
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
+    filter_class = filters.FileFilter
+    queryset = models.File.objects.all()
 
-    def get_queryset(self):
+    # TODO either a) perform all the filter/search/sort/paginate stuff using external modules
+    # or b) find a way to return querysets from it
+
+    """ def get_queryset(self):
         if self.action == "list":
             serializer = serializers.FileSerializer(context=self.get_serializer_context())
             files = serializer.extract_files(models.File.objects.all())
             return files
         else:
-            return models.File.objects.all()
+            return models.File.objects.all() """
 
 
 # Folder API
 class FolderViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.FileserverPermission,)
+    filter_class = filters.FolderFilter
+    queryset = models.Folder.objects.all()
 
-    def get_queryset(self):
+    """ def get_queryset(self):
         if self.action == "list":
             return models.Folder.objects.filter(parent=None)
         else:
-            return models.Folder.objects.all()
+            return models.Folder.objects.all() """
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -181,7 +189,7 @@ class AlbumViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.action == "list":
-            return models.Album.objects.filter(parent=None)
+            return models.Album.objects.all() #.filter(parent=None)
         else:
             return models.Album.objects.all()
 

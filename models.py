@@ -63,7 +63,7 @@ class BaseFolder(models.Model):
         files = File.objects.filter(folder=self.get_folder_instance())
         for file in files:
             if not os.path.isfile(file.get_real_path()):
-                utils.log("Clearing file from database: %s/%s" % (self.name, file.id))
+                utils.log("Clearing file from database: %s/%s" % (self.name, file.file_id))
                 file.delete()
 
         if not os.path.isdir(self.get_real_path()):
@@ -279,7 +279,7 @@ class AlbumFile(models.Model):
 
 # File class
 class File(models.Model):
-    id = models.CharField(max_length=24, primary_key=True)
+    file_id = models.CharField(max_length=24)
     name = models.TextField(null=True)
     folder = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+")
     type = models.TextField(default="file")
@@ -299,15 +299,15 @@ class File(models.Model):
     # TODO get video details using ffmpeg https://gist.github.com/oldo/dc7ee7f28851922cca09
 
     def __str__(self):
-        return "%s (%s.%s)" % (self.name, self.id, self.format)
+        return "%s (%s.%s)" % (self.name, self.file_id, self.format)
 
     # Return the (non-disk) path of the file
     def get_path(self):
-        return self.folder.get_path() + self.id + "." + self.format
+        return self.folder.get_path() + self.file_id + "." + self.format
 
     # Return the disk path of the file
     def get_real_path(self):
-        return self.folder.get_real_path() + self.id + "." + self.format
+        return self.folder.get_real_path() + self.file_id + "." + self.format
 
     @property
     def albums(self):
@@ -335,13 +335,15 @@ class File(models.Model):
         real_path = folder.get_real_path() + full_name
 
         # Search for file already in database
-        file_qs = File.objects.filter(id=name)
+        file_qs = File.objects.filter(file_id=name)
         if file_qs.exists():
             file = file_qs.first()
-            if file.folder != folder:
+            if not os.path.isfile(file.get_real_path()):
                 file.folder = folder
                 file.save()
-            return file
+
+            if file.folder == folder:
+                return file
 
         utils.log("Adding file to database: %s/%s" % (folder.name, full_name))
 
@@ -363,6 +365,9 @@ class File(models.Model):
             new_file["name"] = exif_data["Image"]["ImageDescription"]
             write_title = False
         elif mutagen_title:
+            if isinstance(mutagen_title, list):
+                mutagen_title = ", ".join(mutagen_title)
+
             new_file["name"] = mutagen_title
             write_title = False
         else:
@@ -374,8 +379,11 @@ class File(models.Model):
 
         # Get file timestamp
         exif_timestamp = utils._get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]) or utils._get_if_exist(exif_data, ["Image", "DateTime"])
-        if exif_timestamp:
+        id_timestamp = File.get_id_date(name)
+        if exif_timestamp is not None:
             new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
+        elif id_timestamp is not None:
+            new_file["timestamp"] = id_timestamp
         else:
             new_file["timestamp"] = datetime.datetime.fromtimestamp(os.path.getmtime(real_path))
 
@@ -406,13 +414,13 @@ class File(models.Model):
             new_file["metadata"] = json.dumps(mutagen_data, default=lambda obj: str(obj) if isinstance(obj, bytes) else obj.__dict__)
 
         # Generate ID for file
-        new_file["id"] = File.get_id_name(new_file)
+        new_file["file_id"] = File.get_id_name(new_file)
 
         # Create new file object
         file = File.objects.create(**new_file)
 
         # Get full path of new filename
-        new_real_path = folder.get_real_path() + new_file["id"] + extension
+        new_real_path = folder.get_real_path() + new_file["file_id"] + extension
 
         # Rename file
         os.rename(real_path, new_real_path)
@@ -477,13 +485,20 @@ class File(models.Model):
     def get_id_name(file):
         dt_id = file["timestamp"].strftime("%Y-%m-%d_%H-%M-%S")
 
-        file_qs = File.objects.filter(id__startswith=dt_id)
+        file_qs = File.objects.filter(file_id__startswith=dt_id)
         if file_qs.exists():
-            max_id = int(file_qs.last().id[20:], 16)
+            max_id = int(file_qs.last().file_id[20:], 16)
         else:
             max_id = 0
 
         return dt_id + "_" + "%04x" % (max_id + 1)
+
+    # Get the file timestamp from the name
+    def get_id_date(name):
+        try:
+            return datetime.datetime.strptime(name[: -5], "%Y-%m-%d_%H-%M-%S")
+        except ValueError:
+            return None
 
     # Detect faces in a file
     def detect_faces(self):
