@@ -122,6 +122,8 @@ serializers.ModelSerializer.extract_files = view_extract_files
 
 # Serializer for GeoTag model
 class GeoTagSerializer(serializers.ModelSerializer):
+    """ GeoTag model serializer """
+
     class Meta:
         model = models.GeoTag
         fields = ("id", "latitude", "longitude", "area")
@@ -129,14 +131,21 @@ class GeoTagSerializer(serializers.ModelSerializer):
 
 # Serializer for File model
 class FileSerializer(QueryFieldsMixin, serializers.ModelSerializer):
+    """ File model serializer
+
+    Includes geotag data (TODO maybe remove this).
+    Allows modification of: id, is_starred, is_deleted, geotag
+    """
+
     path = serializers.SerializerMethodField(required=False)
     geotag = GeoTagSerializer()
 
     def get_path(self, obj):
         return obj.get_path()
 
-    # Custom update method to create nested Geotag
     def update(self, instance, validated_data):
+        """ Create new Geotag when nested in update data """
+
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
             new_geotag = models.GeoTag.objects.create(**geotag_data)
@@ -166,15 +175,19 @@ class FileSerializer(QueryFieldsMixin, serializers.ModelSerializer):
         extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["id", "is_starred", "is_deleted", "geotag"]}
 
 
-# Compact serializer for File model
-class SimpleImageSerializer(FileSerializer):
+# Compact serializer for File model TODO confirm no longer needed
+""" class SimpleImageSerializer(FileSerializer):
     class Meta:
         model = models.File
-        fields = [field for field in FileSerializer.Meta.fields if field not in ["path", "type", "length", "timestamp", "duration", "geotag"]]
+        fields = [field for field in FileSerializer.Meta.fields if field not in ["path", "type", "length", "timestamp", "duration", "geotag"]] """
 
 
-# Serializer for Folder model
-class RootFolderSerializer(serializers.ModelSerializer):
+class FolderListSerializer(serializers.ModelSerializer):
+    """ Folder model serializer, for list view
+
+    Provides data about folder, but not its children.
+    """
+
     path = serializers.SerializerMethodField()
 
     def get_path(self, obj):
@@ -185,8 +198,12 @@ class RootFolderSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "path", "type", "file_count", "length")
 
 
-# Serializer for Folder file list
-class FolderSerializer(RootFolderSerializer):
+class FolderSerializer(FolderListSerializer):
+    """ Folder model serializer, for retrieve view
+
+    Provides data about folder and its child folder/file IDs.
+    """
+
     folders = serializers.SerializerMethodField()
     files = serializers.SerializerMethodField()
 
@@ -207,40 +224,27 @@ class FolderSerializer(RootFolderSerializer):
 
     class Meta:
         model = models.Folder
-        fields = RootFolderSerializer.Meta.fields + ("folders", "files")
+        fields = FolderListSerializer.Meta.fields + ("folders", "files")
 
 
-# Album serializer base class
-class BaseAlbumSerializer(serializers.ModelSerializer):
-    path = serializers.SerializerMethodField()
-    file_count = serializers.SerializerMethodField()
+class AlbumListSerializer(serializers.ModelSerializer):
+    """ Album model serializer, for list view
 
-    def get_path(self, obj):
-        return obj.get_path()
-
-    def get_file_count(self, obj):
-        return obj.get_file_count()
-
-    class Meta:
-        fields = ("id", "name", "file_count")  # "path",
-
-
-# Serializer for Album hierarchy
-class RootAlbumsSerializer(BaseAlbumSerializer):
-    """ children = serializers.SerializerMethodField()
-
-    def get_children(self, obj):
-        serializer = RootAlbumsSerializer(models.Album.objects.filter(parent=obj), many=True)
-        return serializer.data """
+    Provides data about album, but not contained files.
+    """
 
     class Meta:
         model = models.Album
-        fields = BaseAlbumSerializer.Meta.fields + ("parent",)  # ("children", "parent")
+        fields = ("id", "name", "file_count", "parent")  # ("children", "parent")
         # extra_kwargs = {"parent": {"write_only": True}}
 
 
-# Serializer for Album, with files
-class AlbumSerializer(BaseAlbumSerializer):
+class AlbumSerializer(serializers.ModelSerializer):
+    """ Album model serializer, for retrieve view
+
+    Provides data about album and contained file IDs.
+    """
+
     files = serializers.SerializerMethodField()
 
     def get_files(self, obj):
@@ -251,10 +255,10 @@ class AlbumSerializer(BaseAlbumSerializer):
 
     class Meta:
         model = models.Album
-        fields = BaseAlbumSerializer.Meta.fields + ("files",)
+        fields = ("id", "name", "file_count", "files")
 
 
-# Serializer for album-file relationship
+# Serializer for album-file relationship TODO
 class AlbumFileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         if not validated_data["album"].get_file_rels().filter(file=validated_data["file"]).exists():
@@ -268,9 +272,13 @@ class AlbumFileSerializer(serializers.ModelSerializer):
         fields = ("id", "file", "album")
 
 
-# Serializer for PersonGroup model
 class PersonGroupSerializer(serializers.ModelSerializer):
-    person_count = serializers.SerializerMethodField()
+    """ PersonGroup model serializer
+
+    Only provides name of group.
+    """
+
+    """ person_count = serializers.SerializerMethodField()
     people = serializers.SerializerMethodField()
 
     def get_person_count(self, obj):
@@ -279,15 +287,19 @@ class PersonGroupSerializer(serializers.ModelSerializer):
     def get_people(self, obj):
         people = models.Person.objects.filter(group=obj)
         serializer = RootPersonSerializer(people, many=True)
-        return serializer.data
+        return serializer.data """
 
     class Meta:
         model = models.PersonGroup
-        fields = ("id", "name", "person_count", "people")
+        fields = ("id", "name")  # , "person_count", "people")
 
 
-# Serializer for displaying multiple people
-class RootPersonSerializer(serializers.ModelSerializer):
+class PersonListSerializer(serializers.ModelSerializer):
+    """ Person model serializer, for list view
+
+    Provides data about person, but not associated faces.
+    """
+
     face_count = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
 
@@ -302,8 +314,12 @@ class RootPersonSerializer(serializers.ModelSerializer):
         fields = ("id", "full_name", "face_count", "thumbnail", "group")  # TODO only display group when in /api/people/
 
 
-# Serializer for individual Person model
-class PersonSerializer(RootPersonSerializer):
+class PersonSerializer(PersonListSerializer):
+    """ Person model serializer, for retrieve view
+
+    Provides data about person and associated face IDs.
+    """
+
     faces = serializers.SerializerMethodField()
 
     def get_faces(self, obj):
@@ -315,21 +331,24 @@ class PersonSerializer(RootPersonSerializer):
 
     class Meta:
         model = models.Person
-        fields = RootPersonSerializer.Meta.fields + ("faces",)
+        fields = PersonListSerializer.Meta.fields + ("faces",)
 
 
-# Serializer for Face model
 class FaceSerializer(serializers.ModelSerializer):
-    file = SimpleImageSerializer()
+    """ Face model serializer
+
+    Provides IDs of file and person.
+    """
 
     class Meta:
         model = models.Face
-        fields = ("id", "rect_x", "rect_y", "rect_w", "rect_h", "file", "person", "status")  # TODO make person only in /api/faces/
+        fields = ("id", "rect_x", "rect_y", "rect_w", "rect_h", "file", "person", "status")
         extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["person", "status"]}
 
 
-# Serializer for GeoTagArea model
 class GeoTagAreaSerializer(serializers.ModelSerializer):
+    """ GeoTagArea model serializer """
+
     class Meta:
         model = models.GeoTagArea
         fields = ("id", "name", "address", "latitude", "longitude", "radius")

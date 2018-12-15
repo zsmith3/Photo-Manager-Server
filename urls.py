@@ -11,7 +11,7 @@ router.register("files", views.FileViewSet, base_name="files")
 
 router.register("folders", views.FolderViewSet, base_name="folders")
 folders_router = routers.NestedDefaultRouter(router, "folders", lookup="folder")
-folders_router.register("files", views.FolderFileViewSet, base_name="folder-files")
+# folders_router.register("files", views.FolderFileViewSet, base_name="folder-files")
 
 router.register("albums", views.AlbumViewSet, base_name="albums")
 albums_router = routers.NestedDefaultRouter(router, "albums", lookup="album")
@@ -21,7 +21,7 @@ router.register("people-groups", views.PersonGroupViewSet, base_name="people-gro
 
 router.register("people", views.PersonViewSet, base_name="people")
 people_router = routers.NestedDefaultRouter(router, "people", lookup="person")
-people_router.register("faces", views.PersonFaceViewSet, base_name="person-faces")
+# people_router.register("faces", views.PersonFaceViewSet, base_name="person-faces")
 
 router.register("faces", views.FaceViewSet, base_name="faces")
 
@@ -53,8 +53,8 @@ urlpatterns = [
     path("api/images/faces/<int:face_id>/<int:height>/", views.face_view),
     path("api/images/faces/<int:face_id>/", views.face_view),
 
-    path("api/images/<str:file_id>/thumbnail/", views.image_thumb_view),
-    path("api/images/<str:file_id>/<int:width>x<int:height>/<int:quality>/", views.image_view),
-    path("api/images/<str:file_id>/<int:width>x<int:height>/", views.image_view),
-    path("api/images/<str:file_id>/", views.image_view)
+    path("api/images/<int:file_id>/thumbnail/", views.image_thumb_view),
+    path("api/images/<int:file_id>/<int:width>x<int:height>/<int:quality>/", views.image_view),
+    path("api/images/<int:file_id>/<int:width>x<int:height>/", views.image_view),
+    path("api/images/<int:file_id>/", views.image_view)
 ]

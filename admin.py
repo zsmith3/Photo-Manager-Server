@@ -3,13 +3,15 @@ from django.utils.html import format_html
 
 import threading
 
-from .models import *
+from . import models
 
-admin.site.register(AuthGroup)
-admin.site.register(UserConfig)
+admin.site.register(models.AuthGroup)
+admin.site.register(models.UserConfig)
 
 
 def get_files(modeladmin, request, queryset):
+    """ Detect new/moved files in the local filesystem """
+
     threads = []
     for folder in queryset:
         threads.append(threading.Thread(target=folder.scan_filesystem))
@@ -20,6 +22,8 @@ get_files.short_description = "Scan the filesystem for new files"
 
 
 def clear_files(modeladmin, request, queryset):
+    """ Detect file deletions in the local filesystem """
+
     threads = []
     for folder in queryset:
         threads.append(threading.Thread(target=folder.prune_database))
@@ -30,6 +34,8 @@ clear_files.short_description = "Prune deleted files from the database"
 
 
 def get_faces(modeladmin, request, queryset):
+    """ Detect faces in image files """
+
     threads = []
     for folder in queryset:
         threads.append(threading.Thread(target=folder.detect_faces))
@@ -40,13 +46,17 @@ get_faces.short_description = "Detect faces in files"
 
 
 def recognize_faces(modeladmin, request, queryset):
-    thread = threading.Thread(target=Face.recognize_faces)
+    """ Recognize faces as people """
+
+    thread = threading.Thread(target=models.Face.recognize_faces)
     thread.start()
     modeladmin.message_user(request, format_html("Began predicting identities of all faces in database. See <a href='/admin/python_log'>here</a> for details."))
 recognize_faces.short_description = "Recognize (all) faces in database"
 
 
 def update_database(modeladmin, request, queryset):
+    """ Run all fileserver database updates """
+
     threads = []
     for folder in queryset:
         threads.append(threading.Thread(target=folder.update_database))
@@ -56,25 +66,28 @@ def update_database(modeladmin, request, queryset):
 update_database.short_description = "Update all aspects of the database"
 
 
-class RootAdmin(admin.ModelAdmin):
+class RootFolderAdmin(admin.ModelAdmin):
+    """ Admin actions for fileserver database management, attached to RootFolder """
+
     actions = [get_files, clear_files, get_faces, recognize_faces, update_database]
 
-admin.site.register(RootFolder, RootAdmin)
 
-admin.site.register(Folder)
+admin.site.register(models.RootFolder, RootFolderAdmin)
 
-admin.site.register(Album)
+admin.site.register(models.Folder)
 
-admin.site.register(AlbumFile)
+admin.site.register(models.Album)
 
-admin.site.register(PersonGroup)
+admin.site.register(models.AlbumFile)
 
-admin.site.register(Person)
+admin.site.register(models.PersonGroup)
 
-admin.site.register(File)
+admin.site.register(models.Person)
 
-admin.site.register(Face)
+admin.site.register(models.File)
 
-admin.site.register(GeoTagArea)
+admin.site.register(models.Face)
 
-admin.site.register(GeoTag)
+admin.site.register(models.GeoTagArea)
+
+admin.site.register(models.GeoTag)
