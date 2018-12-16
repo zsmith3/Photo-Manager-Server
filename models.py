@@ -61,7 +61,7 @@ class BaseFolder(models.Model):
         """
 
         subfolder_length = sum(folder.length for folder in Folder.objects.filter(parent=self.get_folder_instance()))
-        file_length = File.objects.filter(folder=self.get_folder_instance()).aggregate(models.Sum("length"))["length__sum"]
+        file_length = File.objects.filter(folder=self.get_folder_instance()).aggregate(models.Sum("length"))["length__sum"] or 0
         return subfolder_length + file_length
 
     def get_fs_filenames(self):
@@ -575,8 +575,8 @@ class File(models.Model):
     """
 
     FILE_TYPES = (
-        ("image", "Image file")
-        ("video", "Video file")
+        ("image", "Image file"),
+        ("video", "Video file"),
         ("file", "Non-image file")
     )
 
