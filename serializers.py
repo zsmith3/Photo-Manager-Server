@@ -195,7 +195,7 @@ class FolderListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Folder
-        fields = ("id", "name", "path", "file_count", "length")
+        fields = ("id", "name", "path", "parent", "file_count", "length")
 
 
 class FolderSerializer(FolderListSerializer):

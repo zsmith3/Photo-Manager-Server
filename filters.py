@@ -13,7 +13,7 @@ class FileFilter(filters.FilterSet):
 
     class Meta:
         model = models.File
-        fields = {"id": ["in"]}
+        fields = {"id": ["in"], "folder": ["exact"]}
 
 
 class FolderFilter(filters.FilterSet):
@@ -29,4 +29,4 @@ class FolderFilter(filters.FilterSet):
 
     class Meta:
         model = models.Folder
-        fields = {"id": ["in"], "parent": ["isnull"]}
+        fields = {"id": ["in"], "parent": ["exact", "isnull"]}
