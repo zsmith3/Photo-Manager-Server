@@ -1,0 +1,21 @@
+# Django modules
+django
+djangorestframework
+djangorestframework-jwt
+djangorestframework-msgpack
+drf-nested-routers
+djangorestframework-filters==1.0.0.dev0
+
+# Generic Python modules
+numpy
+user_agents
+
+# Image modules
+opencv-python
+opencv-contrib-python
+Pillow
+
+# Metadata modules
+ExifRead
+piexif
+mutagen

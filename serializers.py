@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from drf_queryfields import QueryFieldsMixin
 from . import models, utils
 
 
@@ -130,7 +129,7 @@ class GeoTagSerializer(serializers.ModelSerializer):
 
 
 # Serializer for File model
-class FileSerializer(QueryFieldsMixin, serializers.ModelSerializer):
+class FileSerializer(serializers.ModelSerializer):
     """ File model serializer
 
     Includes geotag data (TODO maybe remove this).

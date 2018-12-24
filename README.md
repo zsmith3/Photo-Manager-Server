@@ -74,29 +74,28 @@ NOTE: this has not been tested in its current state - there is no guarantee thes
 
 ### Server
 
-NOTE: these instructions haven't been tested and are probably missing something.
+These instructions have been tested and might actually work.
 
-1) Install:
-	- [Django](https://www.djangoproject.com/)
-	- [Django Rest Framework](http://www.django-rest-framework.org/)
-		- [JSON WebToken Authentication for DRF](http://getblimp.github.io/django-rest-framework-jwt/)
-		- [MessagePack for DRF](https://github.com/juanriaza/django-rest-framework-msgpack)
-		- [QueryFields for DRF](https://github.com/wimglenn/djangorestframework-queryfields)
-	- [OpenCV-Python](https://pypi.org/project/opencv-python/)
-	- [OpenCV-Contrib-Python](https://pypi.org/project/opencv-contrib-python/)
-	- [Pillow](https://python-pillow.org/) or [Pillow-SIMD](https://github.com/uploadcare/pillow-simd)
-	- [ExifRead](https://pypi.org/project/ExifRead/)
-	- [Mutagen](https://github.com/quodlibet/mutagen)
-	- [Numpy](http://www.numpy.org/)
-	- [Piexif](https://pypi.org/project/piexif/)
-2) Create a new project and add the following settings:
+1) Install Python
+2) Install Django (`pip install django`)
+3) Create a project (`django-admin startproject $projectname` - replace $projectname as desired) and enter it (`cd $projectname`)
+4) Clone this repository (`git clone -b server --single-branch https://github.com/zsmith3/Photo-Manager-Fileserver/ fileserver`) and enter it (`cd fileserver`)
+5) Install dependencies (`pip install -r requirements.txt`)
+6) Modify **$projectname/settings.py**:
 	```python
+	import datetime
+
+	# ...
+
 	INSTALLED_APPS = [
 		"fileserver.apps.FileserverConfig",
 		"rest_framework",
 		"rest_framework.authtoken",
-		...
+		"rest_framework_filters",
+		# ...
 	]
+
+	# ...
 
 	REST_FRAMEWORK = {
 		"DEFAULT_RENDERER_CLASSES": (
@@ -117,9 +116,17 @@ NOTE: these instructions haven't been tested and are probably missing something.
 		"JWT_EXPIRATION_DELTA": datetime.timedelta(365)
 	}
 	```
-3) Create a new app (e.g. "fileserver") and paste all files from this branch into the new app
-4) Add fileserver.urls to the main project urls file
-5) If also hosting the web client, add Django to the static server through WSGI (see [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for Apache instructions)
+7) Modify **$projectname/urls.py**:
+	```python
+	urlpatterns = [
+		path('fileserver/', include('fileserver.urls'))
+		# ...
+	]
+	```
+8) Make migrations (`python manage.py makemigrations fileserver`)
+9) Run migrations (`python manage.py migrate`)
+10) You should now be able to run the server with `python manage.py runserver`
+11) If also hosting the web client, add Django to the static server through WSGI (see [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for Apache instructions)
 
 ## Features
 
