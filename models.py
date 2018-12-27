@@ -128,7 +128,7 @@ class BaseFolder(models.Model):
         utils.log("Detecting faces in folder: %s" % self.name)
 
         # Load cascades if needed
-        if self.type == "root_folder":
+        if isinstance(self, RootFolder):
             global cascades
             cascades["face"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
             cascades["eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
@@ -658,8 +658,8 @@ class File(models.Model):
         # Get file title from exif or name
         exif_title = utils._get_if_exist(exif_data, ["Image", "ImageDescription"])
         mutagen_title = utils._get_if_exist(mutagen_data, ["title"]) or utils._get_if_exist(mutagen_data, ["©nam"])
-        if exif_title:
-            new_file["name"] = exif_data["Image"]["ImageDescription"]
+        if exif_title and exif_title.strip():
+            new_file["name"] = exif_title.strip()
             write_title = False
         elif mutagen_title:
             if isinstance(mutagen_title, list):
@@ -675,14 +675,19 @@ class File(models.Model):
         new_file["length"] = os.path.getsize(real_path)
 
         # Get file timestamp
-        exif_timestamp = utils._get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]) or utils._get_if_exist(exif_data, ["Image", "DateTime"])
-        id_timestamp = File.get_id_date(name)
-        if exif_timestamp is not None:
-            new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
-        elif id_timestamp is not None:
-            new_file["timestamp"] = id_timestamp
-        else:
-            new_file["timestamp"] = datetime.datetime.fromtimestamp(os.path.getmtime(real_path))
+        new_file["timestamp"] = None
+        for exif_timestamp in [utils._get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]), utils._get_if_exist(exif_data, ["Image", "DateTime"]), utils._get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])]:
+            try:
+                new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
+                break
+            except (ValueError, TypeError):
+                pass
+        if new_file["timestamp"] is None:
+            id_timestamp = File.get_id_date(name)
+            if id_timestamp is not None:
+                new_file["timestamp"] = id_timestamp
+            else:
+                new_file["timestamp"] = datetime.datetime.fromtimestamp(os.path.getmtime(real_path))
 
         # Get image dimensions
         exif_width = utils._get_if_exist(exif_data, ["EXIF", "ExifImageWidth"])
@@ -1285,6 +1290,8 @@ class Face(models.Model):
         ----------
         color : int
             OpenCV color encoding constant for Face output
+        height : int, optional
+            Height (pixels) for Face output
 
         Returns
         -------
@@ -1330,6 +1337,8 @@ class Face(models.Model):
             y *= scale
             w *= scale
             h *= scale
+            bbox_w *= scale
+            bbox_h *= scale
         else:
             scaled_image = bbox_image
 

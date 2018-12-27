@@ -1,5 +1,6 @@
 # Django modules
 django
+django-cors-headers
 djangorestframework
 djangorestframework-jwt
 djangorestframework-msgpack

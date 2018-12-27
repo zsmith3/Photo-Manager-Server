@@ -7,13 +7,13 @@ class FileFilter(filters.FilterSet):
 
     Fields
     ------
-    `id` : `in`
-        Fetches a list of files by IDs
+    `folder` : `exact`
+        Fetches files contained in a folder
     """
 
     class Meta:
         model = models.File
-        fields = {"id": ["in"], "folder": ["exact"]}
+        fields = {"folder": ["exact"]}
 
 
 class FolderFilter(filters.FilterSet):
@@ -21,12 +21,23 @@ class FolderFilter(filters.FilterSet):
 
     Fields
     ------
-    `id` : `in`
-        Fetches a list of folders by IDs
-    `parent` : `isnull`
-        Fetches root folders only
+    `parent` : `exact`, `isnull`
+        Fetches subfolders for a folder, or root folders
     """
 
     class Meta:
         model = models.Folder
-        fields = {"id": ["in"], "parent": ["exact", "isnull"]}
+        fields = {"parent": ["exact", "isnull"]}
+
+class FaceFilter(filters.FilterSet):
+    """ Filter set for Face model
+
+    Fields
+    ------
+    `person` : `exact`
+        Fetches faces for a given person
+    """
+
+    class Meta:
+        model = models.Face
+        fields = {"person": ["exact"]}

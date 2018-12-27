@@ -92,6 +92,12 @@ These instructions have been tested and might actually work.
 		"rest_framework",
 		"rest_framework.authtoken",
 		"rest_framework_filters",
+		"corsheaders",
+		# ...
+	]
+
+	MIDDLEWARE = [
+    	"corsheaders.middleware.CorsMiddleware",
 		# ...
 	]
 
@@ -108,13 +114,21 @@ These instructions have been tested and might actually work.
 			"rest_framework_msgpack.parsers.MessagePackParser"
 		),
 		"DEFAULT_AUTHENTICATION_CLASSES": (
-			"rest_framework_jwt.authentication.JSONWebTokenAuthentication"
+			"rest_framework_jwt.authentication.JSONWebTokenAuthentication",
+		),
+		"DEFAULT_FILTER_BACKENDS": (
+			"rest_framework_filters.backends.RestFrameworkFilterBackend",
 		)
 	}
 
 	JWT_AUTH = {
 		"JWT_EXPIRATION_DELTA": datetime.timedelta(365)
 	}
+
+	CORS_ORIGIN_WHITELIST = (
+		"localhost",
+		"localhost:1234"  # for parcel-bundler development server
+	)
 	```
 7) Modify **$projectname/urls.py**:
 	```python
@@ -126,7 +140,9 @@ These instructions have been tested and might actually work.
 8) Make migrations (`python manage.py makemigrations fileserver`)
 9) Run migrations (`python manage.py migrate`)
 10) You should now be able to run the server with `python manage.py runserver`
-11) If also hosting the web client, add Django to the static server through WSGI (see [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for Apache instructions)
+11) Make an admin user (`python manage.py createsuperuser`)
+12) (Currently) add a new RootFolder and User for testing using the admin page (*/admin*). Select a created RootFolder and use the options menu to scan the filesystem and update the database.
+13) If also hosting the web client, add Django to the static server through WSGI (see [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for Apache instructions)
 
 ## Features
 

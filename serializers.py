@@ -263,7 +263,6 @@ class AlbumFileSerializer(serializers.ModelSerializer):
         if not validated_data["album"].get_file_rels().filter(file=validated_data["file"]).exists():
             models.AlbumFile(album=validated_data["album"], file=validated_data["file"]).save()
             validated_data["album"].remove_from_parents(validated_data["file"])
-
         return validated_data
 
     class Meta:

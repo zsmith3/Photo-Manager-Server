@@ -301,59 +301,11 @@ class AlbumViewSet(viewsets.ModelViewSet):
             return super(AlbumViewSet, self).list(request, *args, **kwargs) """
 
 
-# Album files API TODO figure out if this can be trimmed down
 class AlbumFileViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.FileserverPermission,)
-    http_method_names = list(filter(lambda n: n not in ["put", "patch"], viewsets.ModelViewSet.http_method_names))
-
-    def get_queryset(self):
-        album_qs = models.Album.objects.filter(id=self.kwargs["album_pk"])
-
-        if album_qs.exists():
-            album = album_qs.first()
-
-            if self.action == "destroy":
-                album_files = album.get_file_rels()
-                return album_files
-            else:
-                serializer = serializers.AlbumSerializer(context=self.get_serializer_context())
-                files = serializer.extract_files(album.get_files())
-                return files
-        else:
-            raise http.Http404("Album doesn't exist")
-
-    def get_serializer_class(self):
-        if self.action == "create":
-            return serializers.AlbumFileSerializer
-        else:
-            return serializers.FileSerializer
-
-    def get_serializer(self, *args, **kwargs):
-        serializer_class = self.get_serializer_class()
-        kwargs["context"] = self.get_serializer_context()
-
-        if self.action == "create" and self.request.data:
-            kwargs["many"] = True
-
-        return serializer_class(*args, **kwargs)
-
-    def create(self, request, *args, **kwargs):
-        for item in request.data:
-            item["album"] = kwargs["album_pk"]
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return redirect("/fileserver/api/albums/")
-
-    def destroy(self, request, *args, **kwargs):
-        self.lookup_url_kwarg = self.lookup_field
-        self.lookup_field = "file"
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return response.Response(status=status.HTTP_204_NO_CONTENT)
-
+    queryset = models.AlbumFile.objects.all()
+    serializer_class = serializers.AlbumFileSerializer
+    # TODO document
 
 class PersonViewSet(viewsets.ModelViewSet):
     """ Person model viewset
@@ -423,6 +375,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
     queryset = models.Face.objects.all()
+    filter_class = filters.FaceFilter
 
 
 # PersonGroups API
