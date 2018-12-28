@@ -178,7 +178,7 @@ class Folder(BaseFolder):
         folders = Folder.objects.all()
 
         for folder in folders:
-            if folder.get_path() == path:
+            if folder.path == path:
                 return folder
 
         return None
@@ -229,8 +229,9 @@ class Folder(BaseFolder):
         """
         return self
 
-    def get_path(self):
-        """ Get the full (virtual) path to the folder
+    @property
+    def path(self):
+        """ Full (virtual) path to the folder
 
         Includes both the Root Folder name and name of this folder.
         Does not include the real filesystem location.
@@ -244,7 +245,7 @@ class Folder(BaseFolder):
         if self.parent is None:
             return self.name.rstrip("/") + "/"
         else:
-            return self.parent.get_path() + self.name.strip("/") + "/"
+            return self.parent.path + self.name.strip("/") + "/"
 
     def get_real_path(self):
         """ Get the full (real) path to the folder in the local filesystem
@@ -865,8 +866,9 @@ class File(models.Model):
 
         return Face.objects.filter(file=self)
 
-    def get_path(self):
-        """ Get full (virtual) path to file
+    @property
+    def path(self):
+        """ Full (virtual) path to file
 
         Includes the file name. Does not include the real filesystem location.
 
@@ -876,7 +878,7 @@ class File(models.Model):
             Path to file
         """
 
-        return self.folder.get_path() + self.file_id + "." + self.format
+        return self.folder.path + self.name  # self.file_id + "." + self.format
 
     def get_real_path(self):
         """ Get the full (real) path to the file in the local filesystem

@@ -136,11 +136,7 @@ class FileSerializer(serializers.ModelSerializer):
     Allows modification of: id, is_starred, is_deleted, geotag
     """
 
-    path = serializers.SerializerMethodField(required=False)
     geotag = GeoTagSerializer()
-
-    def get_path(self, obj):
-        return obj.get_path()
 
     def update(self, instance, validated_data):
         """ Create new Geotag when nested in update data """
@@ -186,11 +182,6 @@ class FolderListSerializer(serializers.ModelSerializer):
 
     Provides data about folder, but not its children.
     """
-
-    path = serializers.SerializerMethodField()
-
-    def get_path(self, obj):
-        return obj.get_path()
 
     class Meta:
         model = models.Folder

@@ -3,8 +3,7 @@ import os
 
 # Django imports
 from django import http
-from django.shortcuts import redirect
-from rest_framework import response, status, viewsets
+from rest_framework import viewsets
 
 # Third-party imports
 import cv2
@@ -193,6 +192,8 @@ class FileViewSet(viewsets.ModelViewSet):
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all()
+    filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
+    search_fields = ("path", "geotag__area__name", "albums__name", "faces__person__full_name")
 
     # TODO either a) perform all the filter/search/sort/paginate stuff using external modules
     # or b) find a way to return querysets from it
@@ -216,6 +217,8 @@ class FolderViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.FileserverPermission,)
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all()
+    filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
+    search_fields = ("path",)
 
     """ def get_queryset(self):
         if self.action == "list":
