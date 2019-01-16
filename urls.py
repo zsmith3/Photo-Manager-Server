@@ -28,8 +28,6 @@ urlpatterns = [
 
     path("api/", include(router.urls)),
 
-    path("api/images/faces/<int:face_id>/<int:height>/<int:quality>/", views.face_view),
-    path("api/images/faces/<int:face_id>/<int:height>/", views.face_view),
     path("api/images/faces/<int:face_id>/", views.face_view),
 
     path("api/images/<int:file_id>/thumbnail/", views.image_thumb_view),

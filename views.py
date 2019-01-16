@@ -134,14 +134,12 @@ def image_thumb_view(request, *args, **kwargs):
 
 
 def face_view(request, *args, **kwargs):
-    """ Provide the image data for a face
+    """ Provide the saved thumbnail image data for a face
 
     Parameters
     ----------
     face_id : int
         The ID of the face
-    quality : int
-        JPEG quality of response image
 
     Returns
     -------
@@ -157,25 +155,17 @@ def face_view(request, *args, **kwargs):
     face_qs = models.Face.objects.filter(id=kwargs["face_id"])
     if face_qs.exists():
         face = face_qs.first()
-        if not os.path.isfile(face.file.get_real_path()):
-            return http.HttpResponseNotFound()
 
-        # Get the image
-        face_image = face.get_image(cv2.COLOR_BGR2RGB, **kwargs)
+        # Save thumbnail if not already saved
+        if face.thumbnail is None:
+            face.save_thumbnail()
 
-        # Determine the desired quality
-        if "quality" in kwargs:
-            quality = kwargs["quality"]
+        if isinstance(face.thumbnail, bytes):
+            thumb_bytes = face.thumbnail
         else:
-            quality = 75
+            thumb_bytes = face.thumbnail.tobytes()
 
-        # Return image response
-        pil_image = Image.fromarray(face_image)
-        response = http.HttpResponse(content_type="image/jpeg")
-        pil_image.save(response, "JPEG", quality=quality)
-        return response
-
-        # TODO at some point need to look into timings, as seems to be quite slow (although not sure how it compares to old PHP one)
+        return http.HttpResponse(thumb_bytes, content_type="image/jpeg")
     else:
         return http.HttpResponseNotFound()
 

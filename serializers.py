@@ -326,8 +326,10 @@ class PersonSerializer(PersonListSerializer):
 class FaceSerializer(serializers.ModelSerializer):
     """ Face model serializer
 
-    Provides IDs of file and person.
+    Provides data for file, and ID for person.
     """
+
+    file = FileSerializer()
 
     class Meta:
         model = models.Face

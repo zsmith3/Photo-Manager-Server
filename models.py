@@ -1,6 +1,7 @@
 # Standard imports
 import datetime
 import functools
+import io
 import json
 import math
 import os
@@ -979,7 +980,8 @@ class File(models.Model):
                 "status": 3
             }
 
-            Face.objects.create(**face_dict)
+            face = Face.objects.create(**face_dict)
+            face.save_thumbnail()
 
         # Register that file has now been scanned
         self.scanned_faces = True
@@ -1092,6 +1094,9 @@ class Face(models.Model):
         Degree of uncertainty in automatic recognition
     status : PositiveIntegerField
         Status of face identification
+
+    thumbnail : BinaryField
+        Storage of 160x200 face thumbnail (since extraction is slow)
     """
 
     STATUS_OPTIONS = (
@@ -1119,6 +1124,8 @@ class Face(models.Model):
     person = models.ForeignKey(Person, on_delete=models.SET_DEFAULT, default=0, related_name="+")
     uncertainty = models.FloatField()
     status = models.PositiveIntegerField(choices=STATUS_OPTIONS)
+
+    thumbnail = models.BinaryField(null=True)
 
     @staticmethod
     def get_eyes(face):
@@ -1352,6 +1359,16 @@ class Face(models.Model):
         face_image = rot_image[cround(y - h / 2): cround(y + h / 2), cround(x - w / 2): cround(x + w / 2)]
 
         return face_image
+
+    def save_thumbnail(self):
+        """ Get the image thumbnail for this face, and save it to the database """
+
+        face_thumb = self.get_image(cv2.COLOR_BGR2RGB, height=200)
+        pil_thumb = Image.fromarray(face_thumb)
+        stream = io.BytesIO()
+        pil_thumb.save(stream, "JPEG", quality=75)
+        self.thumbnail = stream.getvalue()
+        self.save()
 
 
 class GeoTagArea(models.Model):
