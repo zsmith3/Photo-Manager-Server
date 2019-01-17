@@ -4,6 +4,7 @@ import functools
 import io
 import json
 import math
+import operator
 import os
 import traceback
 
@@ -278,11 +279,11 @@ class Folder(BaseFolder):
 
         children = Folder.objects.filter(parent=self)
         if include_subfolders:
-            return functools.reduce((lambda x, y: x | y), (child.get_children(True) for child in children), children)
+            return functools.reduce(operator.or_, (child.get_children(True) for child in children), children)
         else:
             return children
 
-    def get_files(self, include_subfolders=False):
+    def get_files(self, include_subfolders=False, queryset=None):
         """ Get Files in folder
 
         Parameters
@@ -298,9 +299,12 @@ class Folder(BaseFolder):
             Set of Files in folder
         """
 
-        files = File.objects.filter(folder=self)
+        if queryset is None:
+            queryset = File.objects
+
+        files = queryset.filter(folder=self)
         if include_subfolders:
-            return functools.reduce((lambda x, y: x | y), (child.get_files() for child in self.get_children(True)), files)
+            return functools.reduce(operator.or_, (child.get_files() for child in self.get_children(True)), files)
         else:
             return files
 
@@ -416,13 +420,13 @@ class Album(models.Model):
         path = path.rstrip("/") + "/"
 
         for album in albums:
-            if album.get_path() == path:
+            if album.path == path:
                 return album
 
         return None
 
     def __str__(self):
-        return self.get_path()
+        return self.path
 
     @property
     def path(self):
@@ -437,7 +441,7 @@ class Album(models.Model):
         if self.parent is None:
             return self.name + "/"
         else:
-            return self.parent.get_path() + self.name + "/"
+            return self.parent.path + self.name + "/"
 
     @property
     def file_count(self):
@@ -469,7 +473,7 @@ class Album(models.Model):
 
         children = Album.objects.filter(parent=self)
         if recurse:
-            return functools.reduce((lambda x, y: x | y), (child.get_children(True) for child in children), children)
+            return functools.reduce(operator.or_, (child.get_children(True) for child in children), children)
         else:
             return children
 
@@ -483,7 +487,7 @@ class Album(models.Model):
         """
 
         all_files = self.files.all()
-        return functools.reduce((lambda x, y: x | y), (child.files.all() for child in self.get_children(True)), all_files)
+        return functools.reduce(operator.or_, (child.files.all() for child in self.get_children(True)), all_files)
 
     def get_file_rels(self):
         """ Get all AlbumFile relationships associated with album and its children
@@ -495,7 +499,7 @@ class Album(models.Model):
         """
 
         album_files = AlbumFile.objects.filter(album=self)
-        return functools.reduce((lambda x, y: x | y), (AlbumFile.objects.filter(album=child) for child in self.get_children(True)), album_files)
+        return functools.reduce(operator.or_, (AlbumFile.objects.filter(album=child) for child in self.get_children(True)), album_files)
 
     def remove_from_parents(self, to_remove):
         """ Remove a file from parents of the album
@@ -658,8 +662,8 @@ class File(models.Model):
         mutagen_data = mutagen.File(real_path, easy=True) or {}
 
         # Get file title from exif or name
-        exif_title = utils._get_if_exist(exif_data, ["Image", "ImageDescription"])
-        mutagen_title = utils._get_if_exist(mutagen_data, ["title"]) or utils._get_if_exist(mutagen_data, ["©nam"])
+        exif_title = utils.get_if_exist(exif_data, ["Image", "ImageDescription"])
+        mutagen_title = utils.get_if_exist(mutagen_data, ["title"]) or utils.get_if_exist(mutagen_data, ["©nam"])
         if exif_title and exif_title.strip():
             new_file["name"] = exif_title.strip()
             write_title = False
@@ -678,7 +682,7 @@ class File(models.Model):
 
         # Get file timestamp
         new_file["timestamp"] = None
-        for exif_timestamp in [utils._get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]), utils._get_if_exist(exif_data, ["Image", "DateTime"]), utils._get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])]:
+        for exif_timestamp in [utils.get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]), utils.get_if_exist(exif_data, ["Image", "DateTime"]), utils.get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])]:
             try:
                 new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
                 break
@@ -692,8 +696,8 @@ class File(models.Model):
                 new_file["timestamp"] = datetime.datetime.fromtimestamp(os.path.getmtime(real_path))
 
         # Get image dimensions
-        exif_width = utils._get_if_exist(exif_data, ["EXIF", "ExifImageWidth"])
-        exif_height = utils._get_if_exist(exif_data, ["EXIF", "ExifImageLength"])
+        exif_width = utils.get_if_exist(exif_data, ["EXIF", "ExifImageWidth"])
+        exif_height = utils.get_if_exist(exif_data, ["EXIF", "ExifImageLength"])
         if exif_width and exif_height:
             new_file["width"] = exif_width
             new_file["height"] = exif_height
@@ -704,7 +708,7 @@ class File(models.Model):
             image.close()
 
         # Extract EXIF orientation
-        new_file["orientation"] = utils._get_if_exist(exif_data, ["Image", "Orientation"])
+        new_file["orientation"] = utils.get_if_exist(exif_data, ["Image", "Orientation"])
 
         exif_geotag = GeoTag.from_exif(exif_data)
         if exif_geotag:
@@ -1056,6 +1060,7 @@ class Person(models.Model):
         QuerySet of Face
             The set of Faces found
         """
+
         return Face.objects.filter(person=self, status__lt=4)
 
 
@@ -1467,10 +1472,10 @@ class GeoTag(models.Model):
         """
 
         # Extract variables from dict
-        exif_latitude = utils._get_if_exist(exif_data, ["GPS", "GPSLatitude"])
-        exif_latitude_ref = utils._get_if_exist(exif_data, ["GPS", "GPSLatitudeRef"])
-        exif_longitude = utils._get_if_exist(exif_data, ["GPS", "GPSLongitude"])
-        exif_longitude_ref = utils._get_if_exist(exif_data, ["GPS", "GPSLongitudeRef"])
+        exif_latitude = utils.get_if_exist(exif_data, ["GPS", "GPSLatitude"])
+        exif_latitude_ref = utils.get_if_exist(exif_data, ["GPS", "GPSLatitudeRef"])
+        exif_longitude = utils.get_if_exist(exif_data, ["GPS", "GPSLongitude"])
+        exif_longitude_ref = utils.get_if_exist(exif_data, ["GPS", "GPSLongitudeRef"])
 
         # Extract data from variables
         if exif_latitude and exif_latitude_ref and exif_longitude and exif_longitude_ref:

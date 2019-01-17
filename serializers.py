@@ -13,7 +13,7 @@ def filter_search(self, files):
         file_scores = {}
         for file in files:
             # Get searchable bodies of text related to the file
-            texts = utils._expand_list([utils._get_attr(file, attr) for attr in self.filter_search_attrs])
+            texts = utils.expand_list([utils.get_attr(file, attr) for attr in self.filter_search_attrs])
             # Match each query against each text
             query_matches = [not all([query not in text.lower() for text in texts if text is not None]) for query in queries]
             if True in query_matches:
@@ -32,8 +32,8 @@ serializers.ModelSerializer.filter_search = filter_search
 # Functions to fetch files by filter
 filter_functions = {
     "*": lambda all_files, query: all_files,
-    "G": lambda all_files, query: [file for file in all_files if utils._get_attr(file, "geotag.area.id") == int(query)],
-    "A": lambda all_files, query: [file for file in all_files if int(query) in utils._get_attr(file, "albums.id")],
+    "G": lambda all_files, query: [file for file in all_files if utils.get_attr(file, "geotag.area.id") == int(query)],
+    "A": lambda all_files, query: [file for file in all_files if int(query) in utils.get_attr(file, "albums.id")],
     "F": lambda all_files, query: [file for file in all_files if file.type == query]
 }
 
@@ -74,12 +74,12 @@ serializers.ModelSerializer.apply_filters = apply_filters
 
 # Sort files
 def sort_files(self, files):
-    files.sort(key=lambda file: utils._get_attr(file, "file_id") or file.id)
+    files.sort(key=lambda file: utils.get_attr(file, "file_id") or file.id)
 
     # Sorting for faces
-    files.sort(key=lambda file: utils._get_attr(file, "file.file_id") or 0)
-    files.sort(key=lambda file: utils._get_attr(file, "uncertainty") or 0)
-    files.sort(key=lambda file: utils._get_attr(file, "status") or 0)
+    files.sort(key=lambda file: utils.get_attr(file, "file.file_id") or 0)
+    files.sort(key=lambda file: utils.get_attr(file, "uncertainty") or 0)
+    files.sort(key=lambda file: utils.get_attr(file, "status") or 0)
 
     # TODO other sorting methods
 
@@ -91,8 +91,8 @@ serializers.ModelSerializer.sort_files = sort_files
 # Paginate files
 def paginate_files(self, files):
     try:
-        page = int(utils._get_if_exist(self.context["request"].query_params, ["page"]) or 1)
-        fpp = utils._get_if_exist(self.context["request"].query_params, ["fpp"]) or 50  # TODO get from user config and platform
+        page = int(utils.get_if_exist(self.context["request"].query_params, ["page"]) or 1)
+        fpp = utils.get_if_exist(self.context["request"].query_params, ["fpp"]) or 50  # TODO get from user config and platform
         if fpp == "inf":
             fpp = len(files)
         else:

@@ -183,10 +183,6 @@ class FileViewSet(viewsets.ModelViewSet):
     filter_class = filters.FileFilter
     queryset = models.File.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
-    search_fields = ("path", "geotag__area__name", "albums__name", "faces__person__full_name")
-
-    # TODO either a) perform all the filter/search/sort/paginate stuff using external modules
-    # or b) find a way to return querysets from it
 
     """ def get_queryset(self):
         if self.action == "list":
@@ -208,7 +204,6 @@ class FolderViewSet(viewsets.ReadOnlyModelViewSet):
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
-    search_fields = ("path",)
 
     """ def get_queryset(self):
         if self.action == "list":

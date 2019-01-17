@@ -18,7 +18,7 @@ def log(message):
     f.close()
 
 
-def _get_if_exist(data, keys):
+def get_if_exist(data, keys):
     """ Recursively get a value from a nested dictionary
 
     Parameters
@@ -38,12 +38,12 @@ def _get_if_exist(data, keys):
         if len(keys) == 1:
             return data[keys[0]]
         else:
-            return _get_if_exist(data[keys[0]], keys[1:])
+            return get_if_exist(data[keys[0]], keys[1:])
     else:
         return None
 
 
-def _get_attr(obj, attrs):
+def get_attr(obj, attrs):
     """ Recursively get a value from a nested set of objects
 
     Parameters
@@ -68,16 +68,16 @@ def _get_attr(obj, attrs):
         if len(attrs) > 1:
             value = getattr(obj, key)
             if isinstance(value, list):
-                return [_get_attr(item, attrs[1:]) for item in value]
+                return [get_attr(item, attrs[1:]) for item in value]
             else:
-                return _get_attr(value, attrs[1:])
+                return get_attr(value, attrs[1:])
         else:
             return getattr(obj, key)
     else:
         return None
 
 
-def _expand_list(array):
+def expand_list(array):
     """ Recursively flatten a nested list
 
     Any lists found are flattened and added to output,
@@ -97,8 +97,59 @@ def _expand_list(array):
     new_array = []
     for item in array:
         if isinstance(item, list):
-            new_array += _expand_list(item)
+            new_array += expand_list(item)
         else:
             new_array.append(item)
 
     return new_array
+
+
+def get_full_set(items, func=None):
+    """ Flatten and unique/sort a list of iterables
+
+    Sorted using unique_and_sort.
+
+    Example Usage: Given a list of search queries,
+    and a function to fetch all models matching each query,
+    return a unique, sorted list of all models matching any query.
+
+    Parameters
+    ----------
+    items : list
+        A list of iterables, or of other items (see func)
+    func : function (any -> iterable)
+        A function to convert each item to an iterable
+
+    Returns
+    -------
+    list
+        A sorted list of unique values from within each iterable
+    """
+
+    return unique_and_sort(sum((list(item if func is None else func(item)) for item in items), []))
+
+
+def unique_and_sort(full_list):
+    """ Remove duplicates from a list, and sort items based on how many times they appear
+
+    Items appearing more frequently in the original list will appear earlier in the returned list.
+
+    Parameters
+    ----------
+    full_list : list
+        A list of items, each with an `id` attribute
+
+    Returns
+    -------
+    list
+        A unique, sorted list of items
+    """
+
+    scores = {item.id: 0 for item in full_list}
+    unique_list = []
+    for item in full_list:
+        if scores[item.id] == 0:
+            unique_list.append(item)
+        scores[item.id] += 1
+
+    return sorted(unique_list, key=lambda item: -scores[item.id])
