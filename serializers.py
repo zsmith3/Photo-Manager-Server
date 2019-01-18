@@ -194,8 +194,8 @@ class FolderSerializer(FolderListSerializer):
     Provides data about folder and its child folder/file IDs.
     """
 
-    folders = serializers.SerializerMethodField()
-    files = serializers.SerializerMethodField()
+    # folders = serializers.SerializerMethodField()
+    # files = serializers.SerializerMethodField()
 
     def get_folders(self, obj):
         isf = (self.context["request"].query_params["isf"].lower() == "true") if "isf" in self.context["request"].query_params else False
@@ -214,7 +214,7 @@ class FolderSerializer(FolderListSerializer):
 
     class Meta:
         model = models.Folder
-        fields = FolderListSerializer.Meta.fields + ("folders", "files")
+        fields = FolderListSerializer.Meta.fields  # + ("folders", "files")
 
 
 class AlbumListSerializer(serializers.ModelSerializer):
@@ -309,7 +309,7 @@ class PersonSerializer(PersonListSerializer):
     Provides data about person and associated face IDs.
     """
 
-    faces = serializers.SerializerMethodField()
+    # faces = serializers.SerializerMethodField()
 
     def get_faces(self, obj):
         faces = self.extract_files(models.Face.objects.filter(person=obj, status__lt=4), paginate=False)
@@ -320,7 +320,7 @@ class PersonSerializer(PersonListSerializer):
 
     class Meta:
         model = models.Person
-        fields = PersonListSerializer.Meta.fields + ("faces",)
+        fields = PersonListSerializer.Meta.fields  # + ("faces",)
 
 
 class FaceSerializer(serializers.ModelSerializer):

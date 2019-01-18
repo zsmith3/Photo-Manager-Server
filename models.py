@@ -965,6 +965,11 @@ class File(models.Model):
                 eyes_found = True
                 rotation = Face.get_rotation(eyes)
 
+                # Cut off rotation at 45 degrees, on the assumption that faces should not be sideways
+                # NOTE this is not ideal but there are too many false-positives for eyes
+                if abs(rotation) > 45:
+                    rotation = 0
+
             # Face data
             # TODO center is shifted vertically upwards - maybe should be in line with rotation
             face_dict = {
@@ -1064,6 +1069,18 @@ class Person(models.Model):
         return Face.objects.filter(person=self, status__lt=4)
 
 
+def face_on_person_delete():
+    """ (Face model) Update both `person` and `status` fields when the person is deleted """
+
+    def on_person_delete(collector, field, sub_objs, using):
+        collector.add_field_update(field, field.get_default(), sub_objs)
+        collector.add_field_update(sub_objs[0]._meta.get_field("status"), 3, sub_objs)
+
+    on_person_delete.deconstruct = lambda: ('fileserver.models.face_on_person_delete', (), {})
+
+    return on_person_delete
+
+
 class Face(models.Model):
     """ Face model
 
@@ -1126,7 +1143,7 @@ class Face(models.Model):
     eye_r_y = models.PositiveIntegerField()
 
     file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="+")
-    person = models.ForeignKey(Person, on_delete=models.SET_DEFAULT, default=0, related_name="+")
+    person = models.ForeignKey(Person, on_delete=face_on_person_delete(), default=0, related_name="+")
     uncertainty = models.FloatField()
     status = models.PositiveIntegerField(choices=STATUS_OPTIONS)
 
@@ -1297,6 +1314,9 @@ class Face(models.Model):
             face.save()
         utils.log("Predicted face identities")
 
+    def __str__(self):
+        return f"{self.person.full_name} ({self.id}) in {self.file}"
+
     def get_image(self, color, **kwargs):
         """ Extract this face from its image file
 
@@ -1338,7 +1358,9 @@ class Face(models.Model):
         bbox_w_rounded = cround(x + bbox_w / 2) - cround(x - bbox_w / 2)
         bbox_h_rounded = cround(y + bbox_h / 2) - cround(y - bbox_h / 2)
         bbox_image = numpy.zeros(shape=(bbox_h_rounded, bbox_w_rounded, 3), dtype=numpy.uint8)
-        bbox_image[cround(-min(y - bbox_h / 2, 0)): bbox_h_rounded, cround(-min(x - bbox_w / 2, 0)): bbox_w_rounded] = full_image[cround(max(y - bbox_h / 2, 0)): cround(y + bbox_h / 2), cround(max(x - bbox_w / 2, 0)): cround(x + bbox_w / 2)]
+        bbox_h_max = min(bbox_h_rounded, full_image.shape[0] - cround(max(y - bbox_h / 2, 0)))
+        bbox_w_max = min(bbox_w_rounded, full_image.shape[1] - cround(max(x - bbox_w / 2, 0)))
+        bbox_image[cround(-min(y - bbox_h / 2, 0)): bbox_h_max, cround(-min(x - bbox_w / 2, 0)): bbox_w_max] = full_image[cround(max(y - bbox_h / 2, 0)): cround(y + bbox_h / 2), cround(max(x - bbox_w / 2, 0)): cround(x + bbox_w / 2)]
 
         x = bbox_w / 2
         y = bbox_h / 2
