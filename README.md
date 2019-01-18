@@ -1,6 +1,6 @@
 # Remote Photo Management System - File Server
 
-This is the Django-based server for my photo management system. The client-side code can be found [here](https://github.com/zsmith3/Photo-Manager-Fileserver).
+This is the Django-based server for my photo management system. The client-side code can be found [here](https://github.com/zsmith3/Photo-Manager-Client/).
 
 
 ## Installation
