@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from simple_history.admin import SimpleHistoryAdmin
 
 import threading
 
@@ -66,7 +67,7 @@ def update_database(modeladmin, request, queryset):
 update_database.short_description = "Update all aspects of the database"
 
 
-class RootFolderAdmin(admin.ModelAdmin):
+class RootFolderAdmin(SimpleHistoryAdmin):
     """ Admin actions for fileserver database management, attached to RootFolder """
 
     actions = [get_files, clear_files, get_faces, recognize_faces, update_database]
@@ -74,20 +75,20 @@ class RootFolderAdmin(admin.ModelAdmin):
 
 admin.site.register(models.RootFolder, RootFolderAdmin)
 
-admin.site.register(models.Folder)
+admin.site.register(models.Folder, SimpleHistoryAdmin)
 
-admin.site.register(models.Album)
+admin.site.register(models.Album, SimpleHistoryAdmin)
 
-admin.site.register(models.AlbumFile)
+admin.site.register(models.AlbumFile, SimpleHistoryAdmin)
 
-admin.site.register(models.PersonGroup)
+admin.site.register(models.PersonGroup, SimpleHistoryAdmin)
 
-admin.site.register(models.Person)
+admin.site.register(models.Person, SimpleHistoryAdmin)
 
-admin.site.register(models.File)
+admin.site.register(models.File, SimpleHistoryAdmin)
 
-admin.site.register(models.Face)
+admin.site.register(models.Face, SimpleHistoryAdmin)
 
-admin.site.register(models.GeoTagArea)
+admin.site.register(models.GeoTagArea, SimpleHistoryAdmin)
 
-admin.site.register(models.GeoTag)
+admin.site.register(models.GeoTag, SimpleHistoryAdmin)

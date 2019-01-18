@@ -93,11 +93,13 @@ These instructions have been tested and might actually work.
 		"rest_framework.authtoken",
 		"rest_framework_filters",
 		"corsheaders",
+		"simple_history",
 		# ...
 	]
 
 	MIDDLEWARE = [
     	"corsheaders.middleware.CorsMiddleware",
+		"simple_history.middleware.HistoryRequestMiddleware",
 		# ...
 	]
 

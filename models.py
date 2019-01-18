@@ -10,6 +10,7 @@ import traceback
 
 # Django imports
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 # Third-party imports
 import cv2
@@ -158,6 +159,8 @@ class Folder(BaseFolder):
     parent : ForeignKey(Folder)
         Parent folder
     """
+
+    history = HistoricalRecords()
 
     name = models.TextField()
     parent = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
@@ -322,6 +325,8 @@ class RootFolder(BaseFolder):
         Reference to the standard Folder model instance attached to this
     """
 
+    history = HistoricalRecords()
+
     name = models.TextField()
     real_path = models.TextField()
     folder = models.OneToOneField("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
@@ -398,7 +403,8 @@ class Album(models.Model):
     date_created : DateTimeField
         The date upon which the album was first created
     """
-    # TODO look into proper database history type stuff
+
+    history = HistoricalRecords()
 
     name = models.TextField()
     parent = models.ForeignKey("Album", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
@@ -531,6 +537,8 @@ class AlbumFile(models.Model):
         The date upon which the file was added to the album
     """
 
+    history = HistoricalRecords()
+
     album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="+")
     file = models.ForeignKey("File", on_delete=models.CASCADE, related_name="+")
     # added_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
@@ -579,6 +587,8 @@ class File(models.Model):
     metadata : TextField
         The file metadata (e.g. EXIF), stored as a JSON object
     """
+
+    history = HistoricalRecords()
 
     FILE_TYPES = (
         ("image", "Image file"),
@@ -1009,6 +1019,8 @@ class PersonGroup(models.Model):
 
     """
 
+    history = HistoricalRecords()
+
     name = models.TextField()
 
     def __str__(self):
@@ -1027,6 +1039,8 @@ class Person(models.Model):
     date_created : DateTimeField
         The date upon which the person was created
     """
+
+    history = HistoricalRecords()
 
     full_name = models.TextField()
     group = models.ForeignKey(PersonGroup, on_delete=models.SET_DEFAULT, default=0, related_name="+")
@@ -1120,6 +1134,8 @@ class Face(models.Model):
     thumbnail : BinaryField
         Storage of 160x200 face thumbnail (since extraction is slow)
     """
+
+    history = HistoricalRecords()
 
     STATUS_OPTIONS = (
         (0, "Confirmed (root)"),
@@ -1420,6 +1436,8 @@ class GeoTagArea(models.Model):
         The date upon which this area was created
     """
 
+    history = HistoricalRecords()
+
     name = models.TextField()
     address = models.TextField()
     latitude = models.FloatField()
@@ -1446,6 +1464,8 @@ class GeoTag(models.Model):
     date_created : DateTimeField
         The date upon which this geotag was created
     """
+
+    history = HistoricalRecords()
 
     latitude = models.FloatField(null=True)
     longitude = models.FloatField(null=True)
