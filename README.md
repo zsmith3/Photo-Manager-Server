@@ -7,7 +7,7 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 
 1) Install [Python](https://www.python.org/downloads/) and [Powershell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-6)
 2) Clone this repository (`git clone https://github.com/zsmith3/Photo-Manager-Server/`) and enter it (`cd Photo-Manager-Server`)
-3) Run `powershell gen_settings.ps1` to generate a user settings file at *photo_manager/settings/user.py* with an auto-generated `SECRET_KEY`
+3) Run `powershell ./gen_settings.ps1` to generate a user settings file at *photo_manager/settings/user.py* with an auto-generated `SECRET_KEY`
 4) Add any settings you want to change in *photo_manager/settings/user.py*. For example, I use PostgreSQL:
 	```python
 	DATABASES = {
@@ -22,7 +22,7 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 	}
 	```
 	Note that the default settings are intended for debugging, **NOT** production use.
-5) Run Python module installation and database migrations using `powershell setup.ps1`. You will also be prompted to create a Django admin user.
+5) Run Python module installation and database migrations using `powershell ./setup.ps1`. You will also be prompted to create a Django admin user.
 6) For production use (NOTE this is not production-ready yet), use any WSGI-supporting web server. I use [Apache](https://httpd.apache.org/), and recommend [using](https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html) and [forcing](https://wiki.apache.org/httpd/RewriteHTTPToHTTPS) HTTPS. See [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for instructions on hosting Django through Apache.
 
 
