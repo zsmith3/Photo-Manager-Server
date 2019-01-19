@@ -1,6 +1,6 @@
 # Remote Photo Management System - File Server
 
-This is the Django-based server for my photo management system. The client-side code can be found [here](https://github.com/zsmith3/Photo-Manager-Client/).
+This is the Django-based server for my photo management system. See [Photo-Manager-Client](https://github.com/zsmith3/Photo-Manager-Client/) for more information about the project, as well as the client-side code.
 
 
 ## Installation
@@ -76,11 +76,6 @@ This is the Django-based server for my photo management system. The client-side 
 11) Make an admin user (`python manage.py createsuperuser`)
 12) (Currently) add a new RootFolder and User for testing using the admin page (*/admin*). Select a created RootFolder and use the options menu to scan the filesystem and update the database.
 13) For production use (NOTE this is not production-ready yet), use any WSGI-supporting web server. I use [Apache](https://httpd.apache.org/), and recommend [using](https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html) and [forcing](https://wiki.apache.org/httpd/RewriteHTTPToHTTPS) HTTPS. See [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for instructions on hosting Django through Apache.
-
-
-## Features
-
-TODO
 
 
 ## Contributing
