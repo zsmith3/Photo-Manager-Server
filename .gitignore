@@ -1,3 +1,6 @@
-migrations/*
+**/migrations/*
 !migrations/setup_data.py
 **/__pycache__/**
+**/settings/user.py
+*.sqlite3
+.vscode
