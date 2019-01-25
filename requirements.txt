@@ -21,3 +21,8 @@ Pillow
 ExifRead
 piexif
 mutagen
+
+# Heroku modules
+# NOTE these are not actually required on non-heroku environments
+gunicorn
+django-heroku
