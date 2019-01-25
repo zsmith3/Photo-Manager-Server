@@ -8,7 +8,7 @@ DEBUG = True
 # Set this variable to True if you want to disable this behaviour
 USE_AUTH_IN_DEBUG = False
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 INSTALLED_APPS = [
     "fileserver.apps.FileserverConfig",
@@ -88,6 +88,8 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
+
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": (

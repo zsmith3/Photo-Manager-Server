@@ -1,6 +1,16 @@
-**/migrations/*
-!migrations/setup_data.py
-**/__pycache__/**
-**/settings/user.py
-*.sqlite3
+# Generic stuff
 .vscode
+**/__pycache__/**
+
+# Ignore database and migrations
+*.sqlite3
+**/migrations/*
+
+# Commit default data setup migration
+!migrations/setup_data.py
+
+# User-specific settings
+**/settings/user.py
+
+# Static files
+**/static/**
