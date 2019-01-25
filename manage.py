@@ -1,3 +1,5 @@
+print("manage.py run")
+
 #!/usr/bin/env python
 import os
 import sys
