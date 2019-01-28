@@ -1,5 +1,3 @@
-print("FS Views")
-
 # Standard imports
 import os
 

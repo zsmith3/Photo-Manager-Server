@@ -1,5 +1,3 @@
-print("Settings file")
-
 import os
 
 # Default settings (commited to git)

@@ -1,5 +1,3 @@
-print("FS App")
-
 from django.apps import AppConfig
 
 
