@@ -1,2 +1,2 @@
-release: python dl_sample_files.py $SAMPLE_ZIP_URL
+release: python manage.py makemigrations && python manage.py makemigrations fileserver && python manage.py migrate
 web: gunicorn photo_manager.wsgi
