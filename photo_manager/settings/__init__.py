@@ -21,3 +21,9 @@ if "heroku" in os.environ:
     import django_heroku
 
     django_heroku.settings(locals())
+
+# Settings for the Heroku-based public demo
+if "heroku_demo" in os.environ:
+    CORS_ORIGIN_ALLOW_ALL = True
+
+    DEBUG = False
