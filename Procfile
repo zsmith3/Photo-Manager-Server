@@ -1,2 +1,2 @@
-release: if ! test -z "$SAMPLE_ZIP_URL"; then curl -LsS "$SAMPLE_ZIP_URL" > sample_files.zip && unzip sample_files.zip -d sample_files && rm sample_files.zip; fi
+release: python dl_sample_files.py $SAMPLE_ZIP_URL
 web: gunicorn photo_manager.wsgi
