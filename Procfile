@@ -1,2 +1,2 @@
-release: pip uninstall -y opencv-python opencv-contrib-python && pip install opencv-python-headless opencv-contrib-python-headless
+release: python manage.py makemigrations && python manage.py makemigrations fileserver && python manage.py migrate
 web: gunicorn photo_manager.wsgi

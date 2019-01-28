@@ -19,3 +19,21 @@ if "heroku" in os.environ:
     import django_heroku
 
     django_heroku.settings(locals())
+
+# Settings for the Heroku-based public demo
+if "heroku_demo" in os.environ:
+    CORS_ORIGIN_ALLOW_ALL = True
+
+    DEBUG = False
+
+    # Download sample files (if not done yet)
+    sample_files_dir = os.path.join(BASE_DIR, "sample_files")
+    if not os.path.isdir(sample_files_dir):
+        import zipfile
+        from urllib import request
+        zip_fn = "sample_files.zip"
+        request.urlretrieve(os.environ["SAMPLE_ZIP_URL"], zip_fn)
+        zip_ref = zipfile.ZipFile(zip_fn, "r")
+        zip_ref.extractall(sample_files_dir)
+        zip_ref.close()
+        os.unlink(zip_fn)
