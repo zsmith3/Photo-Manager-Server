@@ -1,7 +1,6 @@
 import os
 import datetime
 
-
 DEBUG = True
 
 # The API permissions class will authorise all requests in DEBUG mode
@@ -57,12 +56,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "photo_manager.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, "db.sqlite3")
-    }
-}
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": os.path.join(BASE_DIR, "db.sqlite3")}}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -92,25 +86,12 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 REST_FRAMEWORK = {
-    "DEFAULT_RENDERER_CLASSES": (
-        "rest_framework.renderers.JSONRenderer",
-        "rest_framework_msgpack.renderers.MessagePackRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer"
-    ),
-    "DEFAULT_PARSER_CLASSES": (
-        "rest_framework.parsers.JSONParser",
-        "rest_framework_msgpack.parsers.MessagePackParser"
-    ),
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_jwt.authentication.JSONWebTokenAuthentication",
-    ),
-    "DEFAULT_FILTER_BACKENDS": (
-        "rest_framework_filters.backends.RestFrameworkFilterBackend",
-    )
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer", "rest_framework_msgpack.renderers.MessagePackRenderer", "rest_framework.renderers.BrowsableAPIRenderer"),
+    "DEFAULT_PARSER_CLASSES": ("rest_framework.parsers.JSONParser", "rest_framework_msgpack.parsers.MessagePackParser"),
+    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_jwt.authentication.JSONWebTokenAuthentication", ),
+    "DEFAULT_FILTER_BACKENDS": ("rest_framework_filters.backends.RestFrameworkFilterBackend", )
 }
 
-JWT_AUTH = {
-    "JWT_EXPIRATION_DELTA": datetime.timedelta(365)
-}
+JWT_AUTH = {"JWT_EXPIRATION_DELTA": datetime.timedelta(365)}
 
 CORS_ORIGIN_WHITELIST = ("localhost", "localhost:1234")

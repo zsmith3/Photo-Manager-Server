@@ -25,11 +25,8 @@ router.register("geotag-areas", views.GeoTagAreaViewSet, base_name="geotag-areas
 # URL patterns
 urlpatterns = [
     path("api/membership", include(urls)),
-
     path("api/", include(router.urls)),
-
     path("api/images/faces/<int:face_id>/", views.face_view),
-
     path("api/images/<int:file_id>/thumbnail/", views.image_thumb_view),
     path("api/images/<int:file_id>/<int:width>x<int:height>/<int:quality>/", views.image_view),
     path("api/images/<int:file_id>/<int:width>x<int:height>/", views.image_view),

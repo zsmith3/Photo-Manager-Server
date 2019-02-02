@@ -5,7 +5,6 @@ from rest_framework import filters as drf_filters
 
 from . import utils
 
-
 BACKEND = filters.backends.RestFrameworkFilterBackend
 
 

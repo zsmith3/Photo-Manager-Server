@@ -24,7 +24,6 @@ from PIL import Image
 from . import utils
 from .membership.models import *
 
-
 # Global Haar cascades dict
 cascades = {}
 
@@ -590,11 +589,7 @@ class File(models.Model):
 
     history = HistoricalRecords()
 
-    FILE_TYPES = (
-        ("image", "Image file"),
-        ("video", "Video file"),
-        ("file", "Non-image file")
-    )
+    FILE_TYPES = (("image", "Image file"), ("video", "Video file"), ("file", "Non-image file"))
 
     file_id = models.CharField(max_length=24)
     name = models.TextField(null=True)
@@ -616,10 +611,7 @@ class File(models.Model):
     # TODO get video details using ffmpeg https://gist.github.com/oldo/dc7ee7f28851922cca09
 
     # File format-type dict
-    types = {
-        "image": ["jpg", "jpeg", "png"],
-        "video": ["mp4", "mov"]
-    }
+    types = {"image": ["jpg", "jpeg", "png"], "video": ["mp4", "mov"]}
 
     @staticmethod
     def from_fs(full_name, folder):
@@ -661,11 +653,7 @@ class File(models.Model):
         utils.log("Adding file to database: %s/%s" % (folder.name, full_name))
 
         # Create new file dictionary
-        new_file = {
-            "folder": folder,
-            "type": File.get_type(extension),
-            "format": extension[1:]
-        }
+        new_file = {"folder": folder, "type": File.get_type(extension), "format": extension[1:]}
 
         # Get EXIF and mutagen data from file
         exif_data = File.get_exif(real_path)
@@ -692,7 +680,11 @@ class File(models.Model):
 
         # Get file timestamp
         new_file["timestamp"] = None
-        for exif_timestamp in [utils.get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]), utils.get_if_exist(exif_data, ["Image", "DateTime"]), utils.get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])]:
+        for exif_timestamp in [
+                utils.get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]),
+                utils.get_if_exist(exif_data, ["Image", "DateTime"]),
+                utils.get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])
+        ]:
             try:
                 new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
                 break
@@ -921,7 +913,7 @@ class File(models.Model):
         """
 
         try:
-            return datetime.datetime.strptime(file_id[: -5], "%Y-%m-%d_%H-%M-%S")
+            return datetime.datetime.strptime(file_id[:-5], "%Y-%m-%d_%H-%M-%S")
         except ValueError:
             return None
 
@@ -940,9 +932,7 @@ class File(models.Model):
         global cascades
 
         # Local config
-        config = {
-            "max_size": 1000
-        }
+        config = {"max_size": 1000}
 
         utils.log("Detecting faces in file: %s" % str(self))
 
@@ -961,7 +951,7 @@ class File(models.Model):
 
         for x, y, w, h in faces:
             # Get face image data
-            face_mat = full_grayscale[int(round(y / ratio)): int(round((y + h) / ratio)), int(round(x / ratio)): int(round((x + w) / ratio))]
+            face_mat = full_grayscale[int(round(y / ratio)):int(round((y + h) / ratio)), int(round(x / ratio)):int(round((x + w) / ratio))]
 
             # Attempt to find eyes in face
             eyes = Face.get_eyes(face_mat)
@@ -1137,14 +1127,7 @@ class Face(models.Model):
 
     history = HistoricalRecords()
 
-    STATUS_OPTIONS = (
-        (0, "Confirmed (root)"),
-        (1, "Confirmed (user)"),
-        (2, "Predicted"),
-        (3, "Unassigned"),
-        (4, "Ignored"),
-        (5, "Removed")
-    )
+    STATUS_OPTIONS = ((0, "Confirmed (root)"), (1, "Confirmed (user)"), (2, "Predicted"), (3, "Unassigned"), (4, "Ignored"), (5, "Removed"))
 
     rect_x = models.PositiveIntegerField()
     rect_y = models.PositiveIntegerField()
@@ -1185,9 +1168,12 @@ class Face(models.Model):
         height, width = face.shape[:2]
 
         # Detect all possible eyes
-        both_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2) for e in cascades["eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 6), round(height / 6)), (round(width / 4), round(height / 4)))]
-        left_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2) for e in cascades["left_eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 7), round(height / 7)), (round(width / 3), round(height / 3)))]
-        right_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2) for e in cascades["right_eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 7), round(height / 7)), (round(width / 3), round(height / 3)))]
+        both_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2)
+                     for e in cascades["eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 6), round(height / 6)), (round(width / 4), round(height / 4)))]
+        left_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2)
+                     for e in cascades["left_eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 7), round(height / 7)), (round(width / 3), round(height / 3)))]
+        right_eyes = [(e[0] + e[2] / 2, e[1] + e[3] / 2)
+                      for e in cascades["right_eye"].detectMultiScale(face, 1.1, 5, 0, (round(width / 7), round(height / 7)), (round(width / 3), round(height / 3)))]
 
         # Sort eyes by position
         both_eyes.sort(key=lambda eye: eye[1])
@@ -1301,7 +1287,7 @@ class Face(models.Model):
         utils.log("Training face recognition model")
         for i in range(0, known_faces.count(), 50):
             images, labels = [], []
-            for face in known_faces[i: i + 50]:
+            for face in known_faces[i:i + 50]:
                 images.append(face.get_image(cv2.COLOR_BGR2GRAY))
                 labels.append(face.person.id)
 
@@ -1367,7 +1353,7 @@ class Face(models.Model):
             return math.ceil(n) if n % 1 >= 0.5 else math.floor(n)
 
         # Crop image down to bounding box
-        diagonal = math.sqrt(w ** 2 + h ** 2)
+        diagonal = math.sqrt(w**2 + h**2)
         diag_angle = math.atan(h / w)
         bbox_w = max(diagonal * abs(math.cos(diag_angle - abs(math.radians(r)))), w)
         bbox_h = max(diagonal * abs(math.sin(-diag_angle - abs(math.radians(r)))), h)  # TODO not sure if this is a permanent solution or not, will have to see
@@ -1376,7 +1362,8 @@ class Face(models.Model):
         bbox_image = numpy.zeros(shape=(bbox_h_rounded, bbox_w_rounded, 3), dtype=numpy.uint8)
         bbox_h_max = min(bbox_h_rounded, full_image.shape[0] - cround(max(y - bbox_h / 2, 0)))
         bbox_w_max = min(bbox_w_rounded, full_image.shape[1] - cround(max(x - bbox_w / 2, 0)))
-        bbox_image[cround(-min(y - bbox_h / 2, 0)): bbox_h_max, cround(-min(x - bbox_w / 2, 0)): bbox_w_max] = full_image[cround(max(y - bbox_h / 2, 0)): cround(y + bbox_h / 2), cround(max(x - bbox_w / 2, 0)): cround(x + bbox_w / 2)]
+        bbox_image[cround(-min(y - bbox_h / 2, 0)):bbox_h_max, cround(-min(x - bbox_w / 2, 0)):bbox_w_max] = full_image[cround(max(y - bbox_h / 2, 0)):cround(y + bbox_h / 2),
+                                                                                                                        cround(max(x - bbox_w / 2, 0)):cround(x + bbox_w / 2)]
 
         x = bbox_w / 2
         y = bbox_h / 2
@@ -1399,7 +1386,7 @@ class Face(models.Model):
         rot_image = cv2.warpAffine(scaled_image, M, (cround(bbox_w), cround(bbox_h)))
 
         # Crop down to face
-        face_image = rot_image[cround(y - h / 2): cround(y + h / 2), cround(x - w / 2): cround(x + w / 2)]
+        face_image = rot_image[cround(y - h / 2):cround(y + h / 2), cround(x - w / 2):cround(x + w / 2)]
 
         return face_image
 

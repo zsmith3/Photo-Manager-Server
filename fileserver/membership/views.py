@@ -40,7 +40,7 @@ class UserLoginAPIView(views.APIView):
 
 # User Config API
 class UserConfigView(generics.RetrieveUpdateAPIView):
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.UserConfigSerializer
     queryset = models.UserConfig.objects.all()
     http_method_names = [method for method in generics.RetrieveUpdateAPIView.http_method_names if method not in ["put"]]
@@ -61,10 +61,7 @@ class UserStatusView(views.APIView):
 
         data = {"authenticated": fs_auth}
         if fs_auth:
-            data["user"] = {
-                "username": request.user.username,
-                "full_name": request.user.first_name + " " + request.user.last_name
-            }
+            data["user"] = {"username": request.user.username, "full_name": request.user.first_name + " " + request.user.last_name}
         return response.Response(data, status=status.HTTP_200_OK)
 
 

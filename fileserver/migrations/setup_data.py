@@ -28,7 +28,4 @@ class Migration(migrations.Migration):
         ('fileserver', '0001_initial'),
     ]
 
-    operations = [
-        migrations.RunPython(create_auth_groups),
-        migrations.RunPython(create_null_person)
-    ]
+    operations = [migrations.RunPython(create_auth_groups), migrations.RunPython(create_null_person)]
