@@ -5,10 +5,12 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 
 ## Installation
 
-1) Install [Python](https://www.python.org/downloads/) and [Powershell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-6)
+1) Install [Python](https://www.python.org/downloads/)
 2) Clone this repository (`git clone https://github.com/zsmith3/Photo-Manager-Server/`) and enter it (`cd Photo-Manager-Server`)
-3) Run `powershell ./gen_settings.ps1` to generate a user settings file at *photo_manager/settings/user.py* with an auto-generated `SECRET_KEY`
-4) Add any settings you want to change in *photo_manager/settings/user.py*. For example, I use PostgreSQL:
+3) Install dependencies and collect static files:
+	- `pip install -r requirements.txt`
+	- `python manage.py collectstatic`
+4) This will have auto-generated a user-specific settings file at *./photo_manager/settings/user.py*, with a random `SECRET_KEY`. You should add any custom settings you want to this file. For example, I use PostgreSQL:
 	```python
 	DATABASES = {
 		"default": {
@@ -21,8 +23,11 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 		}
 	}
 	```
-	Note that the default settings are intended for debugging, **NOT** production use.
-5) Run Python module installation and database migrations using `powershell ./setup.ps1`. You will also be prompted to create a Django admin user.
+5) Now perform database migrations:
+	- `python manage.py makemigrations`
+	- `python manage.py makemigrations fileserver`
+	- `python manage.py migrate`
+	- `python manage.py createsuperuser` (optional)
 6) For production use (NOTE this is not production-ready yet), use any WSGI-supporting web server. I use [Apache](https://httpd.apache.org/), and recommend [using](https://httpd.apache.org/docs/2.4/ssl/ssl_howto.html) and [forcing](https://wiki.apache.org/httpd/RewriteHTTPToHTTPS) HTTPS. See [here](https://docs.djangoproject.com/en/2.1/howto/deployment/wsgi/modwsgi/) for instructions on hosting Django through Apache.
 
 
@@ -30,6 +35,10 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 
 1) Having followed the installation steps above, you should now be able to run the server with `python manage.py runserver`
 2) (Currently) add a new RootFolder using the admin page (*/admin*). Select a created RootFolder and use the options menu to scan the filesystem and update the database.
+
+This codebase uses YAPF for formatting - use the following command to auto-format all files:
+
+`yapf --in-place --recursive --style='{column_limit: 180}' .`
 
 
 ## Contributing

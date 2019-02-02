@@ -12,27 +12,12 @@ from . import models
 # Registration API serializer
 class UserCreateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(label="Email Address")
-    confirm_password = serializers.CharField(
-        max_length=128,
-        required=True,
-        allow_blank=False,
-        write_only=True,
-        style={"input_type": "password"},
-        label="Confirm Password"
-    )
+    confirm_password = serializers.CharField(max_length=128, required=True, allow_blank=False, write_only=True, style={"input_type": "password"}, label="Confirm Password")
     token = serializers.CharField(max_length=64, required=True, allow_blank=False, write_only=True)
 
     class Meta:
         model = User
-        fields = (
-            "username",
-            "email",
-            "password",
-            "confirm_password",
-            "first_name",
-            "last_name",
-            "token"
-        )
+        fields = ("username", "email", "password", "confirm_password", "first_name", "last_name", "token")
         extra_kwargs = {"password": {"write_only": True}}
 
     # Check email has not been used before

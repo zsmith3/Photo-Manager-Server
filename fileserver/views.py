@@ -177,13 +177,12 @@ class FileViewSet(viewsets.ModelViewSet):
     Does not provide actual image data.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.FileSerializer
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
-
     """ def get_queryset(self):
         if self.action == "list":
             serializer = serializers.FileSerializer(context=self.get_serializer_context())
@@ -200,11 +199,10 @@ class FolderViewSet(viewsets.ReadOnlyModelViewSet):
     For single retrieve, provides IDs of all child files and folders.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
-
     """ def get_queryset(self):
         if self.action == "list":
             return models.Folder.objects.filter(parent=None)
@@ -259,9 +257,8 @@ class AlbumViewSet(viewsets.ModelViewSet):
     For single retrieve, provides IDs of all contained files.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     queryset = models.Album.objects.all()
-
     """ def get_queryset(self):
         if self.action == "list":
             return models.Album.objects.all()  # .filter(parent=None)
@@ -290,10 +287,11 @@ class AlbumViewSet(viewsets.ModelViewSet):
 
 
 class AlbumFileViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     queryset = models.AlbumFile.objects.all()
     serializer_class = serializers.AlbumFileSerializer
     # TODO document
+
 
 class PersonViewSet(viewsets.ModelViewSet):
     """ Person model viewset
@@ -302,10 +300,9 @@ class PersonViewSet(viewsets.ModelViewSet):
     For single retrieve, provides IDs of all associated faces.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     queryset = models.Person.objects.all()
-
     """ def get_queryset(self):
         return models.Person.objects.all() """
 
@@ -359,7 +356,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     Also allows modification.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
     queryset = models.Face.objects.all()
@@ -373,7 +370,7 @@ class PersonGroupViewSet(viewsets.ModelViewSet):
     Provides data about people groups, and allows modification.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.PersonGroupSerializer
     queryset = models.PersonGroup.objects.all()
@@ -386,6 +383,6 @@ class GeoTagAreaViewSet(viewsets.ModelViewSet):
     Provides data about geotag areas, and allows modification.
     """
 
-    permission_classes = (permissions.FileserverPermission,)
+    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.GeoTagAreaSerializer
     queryset = models.GeoTagArea.objects.all()

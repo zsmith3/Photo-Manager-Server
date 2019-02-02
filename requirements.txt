@@ -12,6 +12,9 @@ django-simple-history
 numpy
 user_agents
 
+# Formatting
+yapf
+
 # Image modules
 opencv-python
 opencv-contrib-python

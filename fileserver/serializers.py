@@ -26,6 +26,7 @@ def filter_search(self, files):
     else:
         return files
 
+
 serializers.ModelSerializer.filter_search_attrs = ["name", "geotag.area.name", "albums.name", "faces.person.full_name"]
 serializers.ModelSerializer.filter_search = filter_search
 
@@ -69,6 +70,7 @@ def apply_filters(self, files):
     else:
         return files
 
+
 serializers.ModelSerializer.apply_filters = apply_filters
 
 
@@ -85,6 +87,7 @@ def sort_files(self, files):
 
     return files
 
+
 serializers.ModelSerializer.sort_files = sort_files
 
 
@@ -100,7 +103,8 @@ def paginate_files(self, files):
     except:
         raise ValueError  # TODO raise http error (bad request)
 
-    return files[max((page - 1) * fpp, 0): min(page * fpp, len(files))]
+    return files[max((page - 1) * fpp, 0):min(page * fpp, len(files))]
+
 
 serializers.ModelSerializer.paginate_files = paginate_files
 
@@ -115,6 +119,7 @@ def view_extract_files(self, files, paginate=True):
         files = self.paginate_files(files)
 
     return files
+
 
 serializers.ModelSerializer.extract_files = view_extract_files
 
@@ -151,22 +156,7 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.File
-        fields = (
-            "id",
-            "name",
-            "path",
-            "type",
-            "format",
-            "length",
-            "is_starred",
-            "is_deleted",
-            "timestamp",
-            "width",
-            "height",
-            "orientation",
-            "duration",
-            "geotag"
-        )
+        fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "timestamp", "width", "height", "orientation", "duration", "geotag")
         extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["id", "is_starred", "is_deleted", "geotag"]}
 
 
@@ -266,7 +256,6 @@ class PersonGroupSerializer(serializers.ModelSerializer):
 
     Only provides name of group.
     """
-
     """ person_count = serializers.SerializerMethodField()
     people = serializers.SerializerMethodField()
 

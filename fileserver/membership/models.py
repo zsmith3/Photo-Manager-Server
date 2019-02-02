@@ -44,26 +44,14 @@ class UserConfig(models.Model):
             }
         },
         "select_mode": {
-            "options": (
-                (0, "Standard"),
-                (1, "View"),
-                (2, "Select")
-            ),
+            "options": ((0, "Standard"), (1, "View"), (2, "Select")),
             "default": {
                 "desktop": 0,
                 "mobile": 1
             }
         },
         "fpp": {
-            "options": (
-                ("10", "10"),
-                ("25", "25"),
-                ("50", "50"),
-                ("100", "100"),
-                ("200", "200"),
-                ("500", "500"),
-                ("inf", "Unlimited")
-            ),
+            "options": (("10", "10"), ("25", "25"), ("50", "50"), ("100", "100"), ("200", "200"), ("500", "500"), ("inf", "Unlimited")),
             "default": {
                 "desktop": "50",
                 "mobile": "25"
@@ -110,5 +98,6 @@ class UserConfig(models.Model):
 def create_user_config(sender, instance, created, **kwargs):
     if created:
         UserConfig.objects.create(user=instance)
+
 
 models.signals.post_save.connect(create_user_config, sender=User)
