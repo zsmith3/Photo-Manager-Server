@@ -1,5 +1,7 @@
 # Remote Photo Management System - File Server
 
+[![Build Status](https://travis-ci.com/zsmith3/Photo-Manager-Server.svg?branch=master)](https://travis-ci.com/zsmith3/Photo-Manager-Server)
+
 This is the Django-based server for my photo management system. See [Photo-Manager-Client](https://github.com/zsmith3/Photo-Manager-Client/) for more information about the project, as well as the client-side code.
 
 
