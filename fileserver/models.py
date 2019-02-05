@@ -718,10 +718,13 @@ class File(models.Model):
         # TODO get from other metadata if possible
 
         # Assign metadata dictionary to new file
-        if exif_data:
-            new_file["metadata"] = json.dumps(exif_data, default=lambda obj: str(obj) if isinstance(obj, bytes) else obj.__dict__)
-        elif mutagen_data:
-            new_file["metadata"] = json.dumps(mutagen_data, default=lambda obj: str(obj) if isinstance(obj, bytes) else obj.__dict__)
+        all_metadata = {
+            "path": folder.path + name,
+            "mtime": os.path.getmtime(real_path),
+            "exif": exif_data,
+            "mutagen": mutagen_data
+        }
+        new_file["metadata"] = json.dumps(all_metadata, default=lambda obj: str(obj) if isinstance(obj, bytes) else obj.__dict__)
 
         # Generate ID for file
         new_file["file_id"] = File.get_id_name(new_file)
