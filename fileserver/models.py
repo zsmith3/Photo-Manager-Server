@@ -24,10 +24,8 @@ from PIL import Image
 from . import utils
 from .membership.models import *
 
-
 # Allow very large images to be read
 Image.MAX_IMAGE_PIXELS = None
-
 
 # Global Haar cascades dict
 cascades = {}
@@ -1385,7 +1383,7 @@ class Face(models.Model):
         bbox_y1, bbox_x1 = -min(virtual_y1, 0), -min(virtual_x1, 0)
         bbox_y2, bbox_x2 = bbox_y1 + bbox_copy_h, bbox_x1 + bbox_copy_w
         # Copy pixels
-        bbox_image[bbox_y1: bbox_y2, bbox_x1: bbox_x2] = full_image[actual_y1: actual_y2, actual_x1: actual_x2]
+        bbox_image[bbox_y1:bbox_y2, bbox_x1:bbox_x2] = full_image[actual_y1:actual_y2, actual_x1:actual_x2]
 
         x = bbox_w / 2
         y = bbox_h / 2
