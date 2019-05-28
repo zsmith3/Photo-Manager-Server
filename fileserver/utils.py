@@ -12,7 +12,7 @@ def log(message):
         The message to log
     """
 
-    f = open(settings.BASE_DIR + "/python_log.txt", "a")
+    f = open(settings.BASE_DIR + "/python_log.txt", "a", encoding="utf8")
     timeStr = datetime.datetime.now().strftime("[%d/%m/%Y %H:%M:%S] > ")
     f.write(timeStr + message + "\n")
     f.close()

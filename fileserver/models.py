@@ -24,6 +24,9 @@ from PIL import Image
 from . import utils
 from .membership.models import *
 
+# Allow very large images to be read
+Image.MAX_IMAGE_PIXELS = None
+
 # Global Haar cascades dict
 cascades = {}
 
@@ -596,7 +599,7 @@ class File(models.Model):
     folder = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+")
     type = models.TextField(choices=FILE_TYPES, default="file")
     format = models.TextField(null=True)
-    length = models.PositiveIntegerField()
+    length = models.BigIntegerField()
     is_starred = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     timestamp = models.DateTimeField(null=True)
@@ -680,17 +683,27 @@ class File(models.Model):
 
         # Get file timestamp
         new_file["timestamp"] = None
+        all_timestamps = []
         for exif_timestamp in [
                 utils.get_if_exist(exif_data, ["EXIF", "DateTimeOriginal"]),
                 utils.get_if_exist(exif_data, ["Image", "DateTime"]),
                 utils.get_if_exist(exif_data, ["EXIF", "DateTimeDigitized"])
         ]:
             try:
-                new_file["timestamp"] = datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S")
-                break
+                all_timestamps.append(datetime.datetime.strptime(exif_timestamp, "%Y:%m:%d %H:%M:%S"))
             except (ValueError, TypeError):
-                pass
-        if new_file["timestamp"] is None:
+                all_timestamps.append(None)
+
+        # Choose best available timestamp
+        if all_timestamps[0] is not None:
+            new_file["timestamp"] = all_timestamps[0]
+        elif all_timestamps[1] is not None and all_timestamps[2] is not None:
+            new_file["timestamp"] = min(all_timestamps[1], all_timestamps[2])
+        elif all_timestamps[1] is not None:
+            new_file["timestamp"] = all_timestamps[1]
+        elif all_timestamps[2] is not None:
+            new_file["timestamp"] = all_timestamps[2]
+        else:
             id_timestamp = File.get_id_date(name)
             if id_timestamp is not None:
                 new_file["timestamp"] = id_timestamp
@@ -826,7 +839,7 @@ class File(models.Model):
 
         dt_id = file["timestamp"].strftime("%Y-%m-%d_%H-%M-%S")
 
-        file_qs = File.objects.filter(file_id__startswith=dt_id)
+        file_qs = File.objects.filter(file_id__startswith=dt_id).order_by("file_id")
         if file_qs.exists():
             max_id = int(file_qs.last().file_id[20:], 16)
         else:
@@ -1350,18 +1363,27 @@ class Face(models.Model):
         def cround(n):
             return math.ceil(n) if n % 1 >= 0.5 else math.floor(n)
 
-        # Crop image down to bounding box
+        # Crop down to bbox
+
+        # Magnitude and direction of bbox diagonal
         diagonal = math.sqrt(w**2 + h**2)
         diag_angle = math.atan(h / w)
+        # Intended (non-rounded) bbox size
+        bbox_h = max(diagonal * abs(math.sin(-diag_angle - abs(math.radians(r)))), h)
         bbox_w = max(diagonal * abs(math.cos(diag_angle - abs(math.radians(r)))), w)
-        bbox_h = max(diagonal * abs(math.sin(-diag_angle - abs(math.radians(r)))), h)  # TODO not sure if this is a permanent solution or not, will have to see
-        bbox_w_rounded = cround(x + bbox_w / 2) - cround(x - bbox_w / 2)
+        # Actual size of final bbox
         bbox_h_rounded = cround(y + bbox_h / 2) - cround(y - bbox_h / 2)
+        bbox_w_rounded = cround(x + bbox_w / 2) - cround(x - bbox_w / 2)
         bbox_image = numpy.zeros(shape=(bbox_h_rounded, bbox_w_rounded, 3), dtype=numpy.uint8)
-        bbox_h_max = min(bbox_h_rounded, full_image.shape[0] - cround(max(y - bbox_h / 2, 0)))
-        bbox_w_max = min(bbox_w_rounded, full_image.shape[1] - cround(max(x - bbox_w / 2, 0)))
-        bbox_image[cround(-min(y - bbox_h / 2, 0)):bbox_h_max, cround(-min(x - bbox_w / 2, 0)):bbox_w_max] = full_image[cround(max(y - bbox_h / 2, 0)):cround(y + bbox_h / 2),
-                                                                                                                        cround(max(x - bbox_w / 2, 0)):cround(x + bbox_w / 2)]
+        # Co-ordinates and dimensions of box to copy from original image
+        virtual_y1, virtual_y2, virtual_x1, virtual_x2 = cround(y - bbox_h / 2), cround(y + bbox_h / 2), cround(x - bbox_w / 2), cround(x + bbox_w / 2)
+        actual_y1, actual_y2, actual_x1, actual_x2 = max(virtual_y1, 0), min(virtual_y2, full_image.shape[0]), max(virtual_x1, 0), min(virtual_x2, full_image.shape[1])
+        bbox_copy_h, bbox_copy_w = actual_y2 - actual_y1, actual_x2 - actual_x1
+        # Co-ordinate region to copy to in bbox
+        bbox_y1, bbox_x1 = -min(virtual_y1, 0), -min(virtual_x1, 0)
+        bbox_y2, bbox_x2 = bbox_y1 + bbox_copy_h, bbox_x1 + bbox_copy_w
+        # Copy pixels
+        bbox_image[bbox_y1:bbox_y2, bbox_x1:bbox_x2] = full_image[actual_y1:actual_y2, actual_x1:actual_x2]
 
         x = bbox_w / 2
         y = bbox_h / 2

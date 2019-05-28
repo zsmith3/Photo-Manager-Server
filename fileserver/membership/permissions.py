@@ -12,18 +12,15 @@ class FileserverPermission(permissions.BasePermission):
         if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
             return True
 
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            try:
-                auth = JSONWebTokenAuthentication().authenticate(request)
-            except exceptions.AuthenticationFailed:
-                return False
+        try:
+            auth = JSONWebTokenAuthentication().authenticate(request)
+        except exceptions.AuthenticationFailed:
+            return False
 
-            if auth is None:
-                return False
-            else:
-                user = auth[0]
+        if auth is None:
+            return False
+        else:
+            user = auth[0]
 
         if models.AuthGroup.user_is_admin(user):
             return True
