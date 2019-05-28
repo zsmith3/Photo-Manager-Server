@@ -183,6 +183,7 @@ class FileViewSet(viewsets.ModelViewSet):
     filter_class = filters.FileFilter
     queryset = models.File.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
+    pagination_class = filters.CustomPagination
     """ def get_queryset(self):
         if self.action == "list":
             serializer = serializers.FileSerializer(context=self.get_serializer_context())
@@ -361,6 +362,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FaceSerializer
     queryset = models.Face.objects.all()
     filter_class = filters.FaceFilter
+    pagination_class = filters.CustomPagination
 
 
 # PersonGroups API

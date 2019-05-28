@@ -2,6 +2,7 @@ from . import models
 from django.core.exceptions import FieldError
 import rest_framework_filters as filters
 from rest_framework import filters as drf_filters
+from rest_framework import pagination
 
 from . import utils
 
@@ -125,3 +126,10 @@ class CustomSearchFilter(drf_filters.SearchFilter):
         all_files = utils.get_full_set(all_file_sets)
 
         return all_files
+
+
+class CustomPagination(pagination.PageNumberPagination):
+    """ Pagination class which allows for variable page size """
+
+    page_size = 100
+    page_size_query_param = "page_size"
