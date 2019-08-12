@@ -93,3 +93,5 @@ REST_FRAMEWORK = {
 JWT_AUTH = {"JWT_EXPIRATION_DELTA": datetime.timedelta(365)}
 
 CORS_ORIGIN_WHITELIST = ("localhost", "localhost:1234")
+
+PYTHON_LOG_MAX_LINES = 100000

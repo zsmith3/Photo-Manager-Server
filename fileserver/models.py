@@ -1289,7 +1289,7 @@ class Face(models.Model):
 
         # Find user-identified faces
         known_faces = Face.objects.filter(person__id__gt=0, status__lt=3)
-        print("Known faces:", len(known_faces))
+        utils.log("Identified faces: %s" % len(known_faces))
         if len(known_faces) == 0:
             utils.log("No known faces found, not running recognition")
             return
@@ -1297,6 +1297,7 @@ class Face(models.Model):
         # Train the face recognizer using user-identified faces
         utils.log("Training face recognition model")
         for i in range(0, known_faces.count(), 50):
+            utils.log(f"Adding batch starting at: {i}")
             images, labels = [], []
             for face in known_faces[i:i + 50]:
                 images.append(face.get_image(cv2.COLOR_BGR2GRAY))
@@ -1311,13 +1312,13 @@ class Face(models.Model):
 
         # Fetch unconfirmed faces
         unknown_faces = Face.objects.filter(status__lt=4, status__gt=1)
-        print("Unknown faces:", len(unknown_faces))
+        utils.log("Unidentified faces: %s" % len(unknown_faces))
 
         # Predict identities of unknown faces, and save to database
         utils.log("Predicting face identities")
         for face in unknown_faces:
             label, confidence = face_recognizer.predict(face.get_image(cv2.COLOR_BGR2GRAY))
-            print("Predicted %s with confidence %s" % (Person.objects.filter(id=label).first().full_name, confidence))
+            utils.log("Predicted %s with confidence %s" % (Person.objects.filter(id=label).first().full_name, confidence))
             if label == -1:
                 label = 0
             else:
@@ -1374,7 +1375,7 @@ class Face(models.Model):
         # Actual size of final bbox
         bbox_h_rounded = cround(y + bbox_h / 2) - cround(y - bbox_h / 2)
         bbox_w_rounded = cround(x + bbox_w / 2) - cround(x - bbox_w / 2)
-        bbox_image = numpy.zeros(shape=(bbox_h_rounded, bbox_w_rounded, 3), dtype=numpy.uint8)
+        bbox_image = numpy.zeros(shape=(bbox_h_rounded, bbox_w_rounded) + (() if color == cv2.COLOR_BGR2GRAY else (3, )), dtype=numpy.uint8)
         # Co-ordinates and dimensions of box to copy from original image
         virtual_y1, virtual_y2, virtual_x1, virtual_x2 = cround(y - bbox_h / 2), cround(y + bbox_h / 2), cround(x - bbox_w / 2), cround(x + bbox_w / 2)
         actual_y1, actual_y2, actual_x1, actual_x2 = max(virtual_y1, 0), min(virtual_y2, full_image.shape[0]), max(virtual_x1, 0), min(virtual_x2, full_image.shape[1])

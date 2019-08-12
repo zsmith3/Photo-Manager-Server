@@ -1,6 +1,24 @@
+import datetime
+import os
+
 from django.conf import settings
 
-import datetime
+# Logging setup
+if not os.path.isdir(f"{settings.BASE_DIR}/logs/"):
+    os.makedirs(f"{settings.BASE_DIR}/logs/")
+log_file_no = 1
+while True:
+    if not os.path.isfile(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt"):
+        log_file_no -= 1
+        break
+    log_file_no += 1
+if log_file_no == 0:
+    log_file_no = 1
+    open(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt", "w").close()
+with open(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt") as log_f:
+    if len(list(log_f)) >= settings.PYTHON_LOG_MAX_LINES:
+        log_file_no += 1
+    log_f.close()
 
 
 def log(message):
@@ -12,10 +30,62 @@ def log(message):
         The message to log
     """
 
-    f = open(settings.BASE_DIR + "/python_log.txt", "a", encoding="utf8")
+    global log_file_no
+
+    log_f = open(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt", encoding="utf8")
+
+    if len(list(log_f)) >= settings.PYTHON_LOG_MAX_LINES:
+        log_file_no += 1
+
+    log_f.close()
+    log_f = open(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt", "a", encoding="utf8")
+
     timeStr = datetime.datetime.now().strftime("[%d/%m/%Y %H:%M:%S] > ")
-    f.write(timeStr + message + "\n")
-    f.close()
+    log_f.write(timeStr + message + "\n")
+    log_f.close()
+
+
+def read_logs(start_time=None):
+    """ Read all log messages after a certain time from the latest text file log
+
+    Parameters
+    ----------
+    start_time : datetime
+        The earliest timestamp from which to read logs
+
+    Returns
+    -------
+    string, datetime
+        The relevant logs (as a single string), and the timestamp of the most recent line
+    """
+
+    global log_file_no
+
+    log_f = open(f"{settings.BASE_DIR}/logs/python_log_{log_file_no:03d}.txt", encoding="utf8")
+    lines = list(log_f)
+    log_f.close()
+
+    if start_time is not None:
+        done = False
+        for i in range(len(lines)):
+            try:
+                if datetime.datetime.strptime(lines[i][:21], "[%d/%m/%Y %H:%M:%S]") > start_time:
+                    lines = lines[i:]
+                    done = True
+                    break
+            except Exception:
+                pass
+        if not done:
+            lines = []
+
+    end_time = datetime.datetime(1970, 1, 1)
+    for line in lines:
+        try:
+            end_time = max(end_time, datetime.datetime.strptime(line[:21], "[%d/%m/%Y %H:%M:%S]"))
+        except Exception:
+            pass
+
+    return "".join(lines), end_time
 
 
 def get_if_exist(data, keys):

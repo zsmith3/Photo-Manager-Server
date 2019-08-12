@@ -1,4 +1,5 @@
 # Standard imports
+import datetime
 import os
 
 # Django imports
@@ -6,13 +7,100 @@ from django import http
 from rest_framework import viewsets
 
 # Third-party imports
-import cv2
 import piexif
 from PIL import Image
 
 # Local imports
-from . import filters, models, serializers
+from . import filters, models, serializers, utils
 from .membership import permissions
+
+
+def log_api(request, *args, **kwargs):
+    """ Provide API access to python log files
+
+    Parameters
+    ----------
+    request : HttpRequest
+        The HTTP request
+
+    Returns
+    -------
+    HttpResponse(content_type="application/json")
+        The response log data (may be Forbidden)
+    """
+
+    # Ensure request is authorised
+    if not request.user.is_superuser:
+        return http.HttpResponseForbidden()
+
+    if "start_time" in request.GET:
+        start_time = datetime.datetime.strptime(request.GET["start_time"], "%Y-%m-%dT%H:%M:%S")
+    else:
+        start_time = None
+
+    logs, end_time = utils.read_logs(start_time)
+
+    result = {"end_time": end_time, "logs": logs}
+
+    return http.JsonResponse(result)
+
+
+def log_view(request, *args, **kwargs):
+    """ Provide UI access to python log files
+
+    Parameters
+    ----------
+    request : HttpRequest
+        The HTTP request
+
+    Returns
+    -------
+    HttpResponse(content_type="application/json")
+        An auto-refreshing display of log data (may be Forbidden)
+    """
+
+    # Ensure request is authorised
+    if not request.user.is_superuser:
+        return http.HttpResponseForbidden()
+
+    html = """
+    <div id="log"></div>
+
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #log {
+            background-color: black;
+            color: white;
+            font-family: ubuntu;
+            padding: 10px;
+        }
+    </style>
+
+    <script>
+        var logdiv = document.getElementById("log");
+        var nextstart;
+        function load_logs (start_time) {
+            var xhr = new XMLHttpRequest();
+            xhr.responseType = "json";
+            xhr.addEventListener("load", function () {
+                var data = this.response;
+                var atBottom = window.scrollY + window.innerHeight == document.body.scrollHeight;
+                logdiv.innerText += data.logs;
+                if (atBottom) window.scrollTo(0, document.body.scrollHeight);
+                if (data.logs.length > 0) nextstart = data.end_time;
+            });
+            xhr.open("GET", "log_api" + (start_time ? ("?start_time=" + start_time) : ""));
+            xhr.send();
+        }
+        load_logs();
+        window.setInterval(function () { load_logs(nextstart); }, 5000);
+    </script>
+    """
+
+    return http.HttpResponse(html)
 
 
 def image_view(request, *args, **kwargs):
