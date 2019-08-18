@@ -127,7 +127,6 @@ serializers.ModelSerializer.extract_files = view_extract_files
 # Serializer for GeoTag model
 class GeoTagSerializer(serializers.ModelSerializer):
     """ GeoTag model serializer """
-
     class Meta:
         model = models.GeoTag
         fields = ("id", "latitude", "longitude", "area")
@@ -172,7 +171,6 @@ class FolderListSerializer(serializers.ModelSerializer):
 
     Provides data about folder, but not its children.
     """
-
     class Meta:
         model = models.Folder
         fields = ("id", "name", "path", "parent", "file_count", "length")
@@ -193,7 +191,6 @@ class FolderSerializer(FolderListSerializer):
         return [folder.id for folder in folders]
         """ serializer = FileSerializer(folders, many=True)
         return serializer.data """
-
     def get_files(self, obj):
         isf = (self.context["request"].query_params["isf"].lower() == "true") if "isf" in self.context["request"].query_params else False
         files = self.extract_files(obj.get_files(isf), paginate=False)
@@ -201,7 +198,6 @@ class FolderSerializer(FolderListSerializer):
         # TODO apply extraction to non-folder viewsets
         """ serializer = FileSerializer(files, many=True)
         return serializer.data """
-
     class Meta:
         model = models.Folder
         fields = FolderListSerializer.Meta.fields  # + ("folders", "files")
@@ -212,7 +208,6 @@ class AlbumListSerializer(serializers.ModelSerializer):
 
     Provides data about album, but not contained files.
     """
-
     class Meta:
         model = models.Album
         fields = ("id", "name", "file_count", "parent")  # ("children", "parent")
@@ -232,7 +227,6 @@ class AlbumSerializer(serializers.ModelSerializer):
         return [file.id for file in files]
         """ serializer = FileSerializer(files, many=True)
         return serializer.data """
-
     class Meta:
         model = models.Album
         fields = ("id", "name", "file_count", "files")
@@ -266,7 +260,6 @@ class PersonGroupSerializer(serializers.ModelSerializer):
         people = models.Person.objects.filter(group=obj)
         serializer = RootPersonSerializer(people, many=True)
         return serializer.data """
-
     class Meta:
         model = models.PersonGroup
         fields = ("id", "name")  # , "person_count", "people")
@@ -306,7 +299,6 @@ class PersonSerializer(PersonListSerializer):
         return [face.id for face in faces]
         """ serializer = FaceSerializer(faces, many=True)
         return serializer.data """
-
     class Meta:
         model = models.Person
         fields = PersonListSerializer.Meta.fields  # + ("faces",)
@@ -328,7 +320,6 @@ class FaceSerializer(serializers.ModelSerializer):
 
 class GeoTagAreaSerializer(serializers.ModelSerializer):
     """ GeoTagArea model serializer """
-
     class Meta:
         model = models.GeoTagArea
         fields = ("id", "name", "address", "latitude", "longitude", "radius")

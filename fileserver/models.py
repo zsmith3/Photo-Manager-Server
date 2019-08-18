@@ -33,7 +33,6 @@ cascades = {}
 
 class BaseFolder(models.Model):
     """ Abstract base class for Folder and RootFolder """
-
     class Meta:
         abstract = True
 
@@ -1086,7 +1085,6 @@ class Person(models.Model):
 
 def face_on_person_delete():
     """ (Face model) Update both `person` and `status` fields when the person is deleted """
-
     def on_person_delete(collector, field, sub_objs, using):
         collector.add_field_update(field, field.get_default(), sub_objs)
         collector.add_field_update(sub_objs[0]._meta.get_field("status"), 3, sub_objs)

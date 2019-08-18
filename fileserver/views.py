@@ -297,7 +297,6 @@ class FolderViewSet(viewsets.ReadOnlyModelViewSet):
             return models.Folder.objects.filter(parent=None)
         else:
             return models.Folder.objects.all() """
-
     def get_serializer_class(self):
         """ Return different serializers for list and retrieve """
 
@@ -353,7 +352,6 @@ class AlbumViewSet(viewsets.ModelViewSet):
             return models.Album.objects.all()  # .filter(parent=None)
         else:
             return models.Album.objects.all() """
-
     def get_serializer_class(self):
         """ Return different serializers for list and retrieve """
 
@@ -394,7 +392,6 @@ class PersonViewSet(viewsets.ModelViewSet):
     queryset = models.Person.objects.all()
     """ def get_queryset(self):
         return models.Person.objects.all() """
-
     def get_serializer_class(self):
         """ Return different serializers for list and retrieve """
 

@@ -9,6 +9,19 @@ from . import utils
 BACKEND = filters.backends.RestFrameworkFilterBackend
 
 
+class AlbumFilter(filters.FilterSet):
+    """ Filter set for Album model, for use within FileFilter
+    
+    Fields
+    ------
+    `id` : `exact`, `in`
+        Fetches album(s) by ID
+    """
+    class Meta:
+        model = models.Album
+        fields = {"id": ["exact", "in"]}
+
+
 class FileFilter(filters.FilterSet):
     """ Filter set for File model
 
@@ -16,9 +29,13 @@ class FileFilter(filters.FilterSet):
     ------
     `folder` : `exact`, `in`
         Fetches files contained in a folder (or set of folders)
+    `album` : `exact`
+        Fetches files contained in an album and its children
     `isf` : bool
         If true, and a folder has been specified, all files from subfolders will also be included
     """
+
+    album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
 
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         # NOTE temporarily enable isf for all searches, until front-end is developed further
@@ -32,6 +49,11 @@ class FileFilter(filters.FilterSet):
                 data["folder__in"] = ",".join([str(folder.id) for folder in all_folders])
 
         return super(FileFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
+
+    def filter_album(self, qs, name, value):
+        all_files = value.get_files()
+
+        return qs & all_files
 
     class Meta:
         model = models.File
@@ -50,7 +72,6 @@ class FolderFilter(filters.FilterSet):
     `isf` : bool
         If true, and a parent folder has been specified, the full subfolder tree will be fetched
     """
-
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         # NOTE temporarily enable isf for all searches, until front-end is developed further
         if "search" in data or ("parent" in data and "isf" in data and data["isf"] in ["true", "1"]):
@@ -77,7 +98,6 @@ class FaceFilter(filters.FilterSet):
     `person` : `exact`
         Fetches faces for a given person
     """
-
     class Meta:
         model = models.Face
         fields = {"person": ["exact"]}
@@ -88,7 +108,6 @@ class CustomSearchFilter(drf_filters.SearchFilter):
 
     Works on File and Folder models.
     """
-
     def filter_queryset(self, request, queryset, view):
         # Get search query and split into words, sorted by importance (length)
         search_query = request.query_params.get(self.search_param, "").lower()
