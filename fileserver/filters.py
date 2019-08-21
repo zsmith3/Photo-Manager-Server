@@ -100,7 +100,6 @@ class FaceFilter(filters.FilterSet):
     `status` : `exact`, `lt`, `gt`
         Used to ignore unwanted faces (defaults to less than 4)
     """
-
     def __init__(self, data=None, *args, **kwargs):
         # Default to status=lt__4
         if data is not None:
@@ -110,7 +109,7 @@ class FaceFilter(filters.FilterSet):
             for name in data:
                 if "status" in name:
                     done = True
-            
+
             if not done:
                 data["status__lt"] = "4"
 

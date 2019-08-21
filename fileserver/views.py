@@ -379,7 +379,7 @@ class AlbumFileViewSet(viewsets.ModelViewSet):
     Allows creation and deletion of Album-File relationships
     Can be filtered by album and/or file
     """
-    
+
     permission_classes = (permissions.FileserverPermission, )
     queryset = models.AlbumFile.objects.all()
     serializer_class = serializers.AlbumFileSerializer
