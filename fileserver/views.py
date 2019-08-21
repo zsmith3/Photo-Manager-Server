@@ -374,10 +374,16 @@ class AlbumViewSet(viewsets.ModelViewSet):
 
 
 class AlbumFileViewSet(viewsets.ModelViewSet):
+    """ AlbumFile model viewset
+    
+    Allows creation and deletion of Album-File relationships
+    Can be filtered by album and/or file
+    """
+    
     permission_classes = (permissions.FileserverPermission, )
     queryset = models.AlbumFile.objects.all()
     serializer_class = serializers.AlbumFileSerializer
-    # TODO document
+    filter_class = filters.AlbumFileFilter
 
 
 class PersonViewSet(viewsets.ModelViewSet):

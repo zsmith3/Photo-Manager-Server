@@ -121,6 +121,28 @@ class FaceFilter(filters.FilterSet):
         fields = {"person": ["exact"], "status": ["exact", "lt", "gt"]}
 
 
+class AlbumFileFilter(filters.FilterSet):
+    """ Filter set for AlbumFile model
+    
+    Fields
+    ------
+    `file` : `exact`
+        Restricts relationships to a specific file
+    `album` : `exact`
+        Finds relationships with album or its children
+    """
+
+    album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
+
+    def filter_album(self, qs, name, value):
+        all_albums = [value] + list(value.get_children(True))
+        return qs.filter(album__in=all_albums)
+
+    class Meta:
+        model = models.AlbumFile
+        fields = {"file": ["exact"]}
+
+
 class CustomSearchFilter(drf_filters.SearchFilter):
     """ Filter class for custom file-searching method
 
