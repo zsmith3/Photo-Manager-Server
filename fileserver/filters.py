@@ -11,7 +11,7 @@ BACKEND = filters.backends.RestFrameworkFilterBackend
 
 class AlbumFilter(filters.FilterSet):
     """ Filter set for Album model, for use within FileFilter
-    
+
     Fields
     ------
     `id` : `exact`, `in`
@@ -38,8 +38,7 @@ class FileFilter(filters.FilterSet):
     album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
 
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
-        # NOTE temporarily enable isf for all searches, until front-end is developed further
-        if "search" in data or ("folder" in data and "isf" in data and data["isf"] in ["true", "1"]):
+        if "folder" in data and "isf" in data and data["isf"] in ["true", "1"]:
             folder_id = data["folder"]
             folder_qs = models.Folder.objects.filter(id=folder_id)
             if folder_qs.exists():
@@ -73,15 +72,17 @@ class FolderFilter(filters.FilterSet):
         If true, and a parent folder has been specified, the full subfolder tree will be fetched
     """
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
-        # NOTE temporarily enable isf for all searches, until front-end is developed further
-        if "search" in data or ("parent" in data and "isf" in data and data["isf"] in ["true", "1"]):
+        if "parent" in data and "isf" in data and data["isf"] in ["true", "1"]:
             parent_id = data["parent"]
             parent_qs = models.Folder.objects.filter(id=parent_id)
             if parent_qs.exists():
                 parent = parent_qs.first()
                 all_folders = list(parent.get_children(True))
                 data = {key: data[key] for key in data if key != "parent"}
-                data["id__in"] = ",".join([str(folder.id) for folder in all_folders])
+                if len(all_folders) > 0:
+                    data["id__in"] = ",".join([str(folder.id) for folder in all_folders])
+                else:
+                    data["id__in"] = "-1"
 
         return super(FolderFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
 
@@ -122,7 +123,7 @@ class FaceFilter(filters.FilterSet):
 
 class AlbumFileFilter(filters.FilterSet):
     """ Filter set for AlbumFile model
-    
+
     Fields
     ------
     `file` : `exact`
