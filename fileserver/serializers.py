@@ -140,16 +140,27 @@ class FileSerializer(serializers.ModelSerializer):
     Allows modification of: id, is_starred, is_deleted, geotag
     """
 
-    geotag = GeoTagSerializer()
+    geotag = GeoTagSerializer(allow_null=True)
 
     def update(self, instance, validated_data):
         """ Create new Geotag when nested in update data """
 
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
-            new_geotag = models.GeoTag.objects.create(**geotag_data)
-            new_geotag.save()
-            instance.geotag = new_geotag
+            if geotag_data is None:
+                if instance.geotag is not None:
+                    instance.geotag.delete()
+                instance.geotag = None
+            elif instance.geotag is None:
+                new_geotag = models.GeoTag.objects.create(**geotag_data)
+                new_geotag.save()
+                instance.geotag = new_geotag
+            else:
+                GeoTagSerializer().update(instance.geotag, geotag_data)
+
+            if instance.geotag is not None and instance.geotag.latitude is None and instance.geotag.longitude is None and instance.geotag.area is None:
+                instance.geotag.delete()
+                instance.geotag = None
 
         return super(FileSerializer, self).update(instance, validated_data)
 
