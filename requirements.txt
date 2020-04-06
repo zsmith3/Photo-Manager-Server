@@ -3,7 +3,7 @@ django
 django-cors-headers
 djangorestframework
 djangorestframework-jwt
-djangorestframework-msgpack
+git+git://github.com/zsmith3/django-rest-framework-msgpack
 drf-nested-routers
 djangorestframework-filters==1.0.0.dev0
 django-simple-history

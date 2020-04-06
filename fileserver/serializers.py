@@ -202,6 +202,7 @@ class FolderSerializer(FolderListSerializer):
         return [folder.id for folder in folders]
         """ serializer = FileSerializer(folders, many=True)
         return serializer.data """
+
     def get_files(self, obj):
         isf = (self.context["request"].query_params["isf"].lower() == "true") if "isf" in self.context["request"].query_params else False
         files = self.extract_files(obj.get_files(isf), paginate=False)
@@ -209,6 +210,7 @@ class FolderSerializer(FolderListSerializer):
         # TODO apply extraction to non-folder viewsets
         """ serializer = FileSerializer(files, many=True)
         return serializer.data """
+
     class Meta:
         model = models.Folder
         fields = FolderListSerializer.Meta.fields  # + ("folders", "files")
@@ -238,6 +240,7 @@ class AlbumSerializer(serializers.ModelSerializer):
         return [file.id for file in files]
         """ serializer = FileSerializer(files, many=True)
         return serializer.data """
+
     class Meta:
         model = models.Album
         fields = ("id", "name", "file_count", "files")
@@ -310,6 +313,7 @@ class PersonSerializer(PersonListSerializer):
         return [face.id for face in faces]
         """ serializer = FaceSerializer(faces, many=True)
         return serializer.data """
+
     class Meta:
         model = models.Person
         fields = PersonListSerializer.Meta.fields  # + ("faces",)

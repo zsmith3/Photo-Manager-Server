@@ -1480,7 +1480,7 @@ class GeoTag(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return "%s, %s (%s)" % (round(self.latitude, 2), round(self.longitude, 2), self.area)
+        return "%s, %s (%s)" % (round(self.latitude, 2) if self.latitude is not None else None, round(self.longitude, 2) if self.longitude is not None else None, self.area)
 
     @staticmethod
     def exif_to_degrees(values):
