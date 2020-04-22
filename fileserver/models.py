@@ -19,6 +19,8 @@ import mutagen
 import numpy
 import piexif
 from PIL import Image
+import face_recognition
+from sklearn import neighbors
 
 # Local imports
 from . import utils
@@ -1281,32 +1283,44 @@ class Face(models.Model):
 
         utils.log("Recognising faces found previously")
 
-        # Create face recognizer
-        face_recognizer = cv2.face.LBPHFaceRecognizer_create(2, 16, 16, 16)
-        untrained = True
+        # Settings
+        n_neighbors = None  # Chosen automatically
+        knn_algo = "ball_tree"
+        distance_threshold = 0.5
 
-        # Find user-identified faces
-        known_faces = Face.objects.filter(person__id__gt=0, status__lt=3)
-        utils.log("Identified faces: %s" % len(known_faces))
-        if len(known_faces) == 0:
-            utils.log("No known faces found, not running recognition")
-            return
+        # Add each known face
+        utils.log("Encoding known faces")
+        faces_done = 0
+        faces_skipped = 0
+        X = []
+        y = []
+        for person in Person.objects.all():
+            faces = Face.objects.filter(person__id=person.id, status__lt=2)
+            utils.log(f"Encoding {faces.count()} faces for {person.full_name}")
+            for face in faces:
+                image = face.get_image(cv2.COLOR_BGR2RGB)
+                face_bounding_boxes = face_recognition.face_locations(image)
+                if len(face_bounding_boxes) != 1:
+                    # Skip face if face_locations cannot properly detect it
+                    faces_skipped += 1
+                else:
+                    # Add face encoding for current image to the training set
+                    X.append(face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes)[0])
+                    y.append(person.id)
+                    faces_done += 1
+        utils.log(f"Encoded {faces_done} faces, skipped {faces_skipped} faces")
 
-        # Train the face recognizer using user-identified faces
-        utils.log("Training face recognition model")
-        for i in range(0, known_faces.count(), 50):
-            utils.log(f"Adding batch starting at: {i}")
-            images, labels = [], []
-            for face in known_faces[i:i + 50]:
-                images.append(face.get_image(cv2.COLOR_BGR2GRAY))
-                labels.append(face.person.id)
+        # Determine how many neighbors to use for weighting in the KNN classifier
+        if n_neighbors is None:
+            n_neighbors = int(round(math.sqrt(len(X))))
 
-            if untrained:
-                face_recognizer.train(images, numpy.array(labels))
-                untrained = False
-            else:
-                face_recognizer.update(images, numpy.array(labels))
-        utils.log("Trained face recognition model")
+        utils.log("Training KNN classifier")
+
+        # Create and train the KNN classifier
+        knn_clf = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors, algorithm=knn_algo, weights='distance')
+        knn_clf.fit(X, y)
+
+        utils.log("Trained classifier")
 
         # Fetch unconfirmed faces
         unknown_faces = Face.objects.filter(status__lt=4, status__gt=1)
@@ -1314,17 +1328,37 @@ class Face(models.Model):
 
         # Predict identities of unknown faces, and save to database
         utils.log("Predicting face identities")
+        faces_skipped = 0
+        faces_done = 0
+        faces_unknown = 0
         for face in unknown_faces:
-            label, confidence = face_recognizer.predict(face.get_image(cv2.COLOR_BGR2GRAY))
-            utils.log("Predicted %s with confidence %s" % (Person.objects.filter(id=label).first().full_name, confidence))
-            if label == -1:
-                label = 0
+            X_img = face.get_image(cv2.COLOR_BGR2RGB)
+            X_face_locations = face_recognition.face_locations(X_img)
+
+            # Skip face if face_locations cannot properly detect it
+            if len(X_face_locations) != 1:
+                faces_skipped += 1
+                face.person = Person.objects.filter(id=0).first()
+                face.status = 3
+                face.save()
             else:
-                face.status = 2
-            face.person = Person.objects.filter(id=label).first()
-            face.uncertainty = confidence
-            face.save()
-        utils.log("Predicted face identities")
+                faces_encodings = face_recognition.face_encodings(X_img, known_face_locations=X_face_locations)
+
+                closest_distances = knn_clf.kneighbors(faces_encodings, n_neighbors=1)
+                is_match = closest_distances[0][0][0] <= distance_threshold
+
+                result = knn_clf.predict(faces_encodings)[0] if is_match else 0
+                utils.log("Predicted %s with confidence %s" % (Person.objects.filter(id=result).first().full_name, closest_distances[0][0][0]))
+                if result != 0:
+                    faces_done += 1
+                    face.status = 2
+                else:
+                    faces_unknown += 1
+                face.person = Person.objects.filter(id=result).first()
+                face.uncertainty = closest_distances[0][0][0]
+                face.save()
+
+        utils.log(f"Predicted {faces_done} face identities, failed to identify {faces_unknown} faces, skipped {faces_skipped} faces")
 
     def __str__(self):
         return f"{self.person.full_name} ({self.id}) in {self.file}"

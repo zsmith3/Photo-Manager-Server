@@ -375,7 +375,7 @@ class AlbumViewSet(viewsets.ModelViewSet):
 
 class AlbumFileViewSet(viewsets.ModelViewSet):
     """ AlbumFile model viewset
-    
+
     Allows creation and deletion of Album-File relationships
     Can be filtered by album and/or file
     """
@@ -451,7 +451,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.FileserverPermission, )
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
-    queryset = models.Face.objects.all()
+    queryset = models.Face.objects.all().order_by("uncertainty")
     filter_class = filters.FaceFilter
     pagination_class = filters.CustomPagination
 
