@@ -286,17 +286,21 @@ class PersonListSerializer(serializers.ModelSerializer):
     """
 
     face_count = serializers.SerializerMethodField()
+    face_count_confirmed = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
 
     def get_face_count(self, obj):
         return models.Face.objects.filter(person=obj, status__lt=4).count()
+
+    def get_face_count_confirmed(self, obj):
+        return models.Face.objects.filter(person=obj, status__lt=2).count()
 
     def get_thumbnail(self, obj):
         return obj.thumbnail.id if obj.thumbnail is not None else None
 
     class Meta:
         model = models.Person
-        fields = ("id", "full_name", "face_count", "thumbnail", "group")  # TODO only display group when in /api/people/
+        fields = ("id", "full_name", "face_count", "face_count_confirmed", "thumbnail", "group")  # TODO only display group when in /api/people/
 
 
 class PersonSerializer(PersonListSerializer):
