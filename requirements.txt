@@ -19,6 +19,8 @@ yapf
 opencv-python
 opencv-contrib-python
 Pillow
+face_recognition
+scikit-learn
 
 # Metadata modules
 ExifRead
