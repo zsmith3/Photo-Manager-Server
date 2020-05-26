@@ -989,6 +989,11 @@ models.signals.post_save.connect(ScanRootFolder.post_create, sender=ScanRootFold
 
 # Folder for Scan files
 class ScanFolder(BaseFolder):
+    # Class information for BaseFolder methods
+    root_folder_cls = lambda s: ScanRootFolder
+    folder_cls = lambda s: ScanFolder
+    file_cls = lambda s: Scan
+
     history = HistoricalRecords()
 
     name = models.TextField()
