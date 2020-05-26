@@ -15,20 +15,8 @@ from . import filters, models, serializers, utils
 from .membership import permissions
 
 
+# Provide API access to python log files (used by log_view)
 def log_api(request, *args, **kwargs):
-    """ Provide API access to python log files
-
-    Parameters
-    ----------
-    request : HttpRequest
-        The HTTP request
-
-    Returns
-    -------
-    HttpResponse(content_type="application/json")
-        The response log data (may be Forbidden)
-    """
-
     # Ensure request is authorised
     if not request.user.is_superuser:
         return http.HttpResponseForbidden()
@@ -45,20 +33,8 @@ def log_api(request, *args, **kwargs):
     return http.JsonResponse(result)
 
 
+# Provide UI access to python log files (for admin page)
 def log_view(request, *args, **kwargs):
-    """ Provide UI access to python log files
-
-    Parameters
-    ----------
-    request : HttpRequest
-        The HTTP request
-
-    Returns
-    -------
-    HttpResponse(content_type="application/json")
-        An auto-refreshing display of log data (may be Forbidden)
-    """
-
     # Ensure request is authorised
     if not request.user.is_superuser:
         return http.HttpResponseForbidden()
@@ -103,28 +79,8 @@ def log_view(request, *args, **kwargs):
     return http.HttpResponse(html)
 
 
+# Provide an image from File or Scan model ID, with width/height/quality options
 def image_view(request, *args, **kwargs):
-    """ Provide an image from the file ID, with width/height/quality options
-
-    Parameters
-    ----------
-    request : HttpRequest
-        The HTTP request
-    file_id : int
-        The ID of the image file
-    width : int, optional
-        Maximum width of response image
-    height : int, optional
-        Maximum height of response image
-    quality : int
-        JPEG quality of response image
-
-    Returns
-    -------
-    HttpResponse(content_type="image/jpeg")
-        The response image if available (may be NotFound, BadRequest or Forbidden)
-    """
-
     # EXIF orientations constant
     rotations = {3: 180, 6: 270, 8: 90}
 
@@ -132,14 +88,16 @@ def image_view(request, *args, **kwargs):
     if not permissions.FileserverPermission().has_permission(request):
         return http.HttpResponseForbidden()
 
+    is_scan = "scans" in request.path
+
     # Get file, ensure it exists and is an image
-    file_qs = models.File.objects.filter(id=kwargs["file_id"])
+    file_qs = (models.Scan if is_scan else models.File).objects.filter(id=kwargs["file_id"])
     if file_qs.exists():
         file = file_qs.first()
         if not os.path.isfile(file.get_real_path()):
             return http.HttpResponseNotFound()
 
-        if file.type == "image":
+        if is_scan or file.type == "image":
             # Scale image if appropriate
             if "width" in kwargs and "height" in kwargs:
                 # Determine the desired quality
@@ -177,32 +135,22 @@ def image_view(request, *args, **kwargs):
         return http.HttpResponseNotFound()
 
 
+# Provide EXIF thumbnail of image File or Scan if available
 def image_thumb_view(request, *args, **kwargs):
-    """ Provide the EXIF thumbnail of an image file if available
-
-    Parameters
-    ----------
-    file_id : int
-        The ID of the image file
-
-    Returns
-    -------
-    HttpResponse(content_type="image/jpeg")
-        The response thumbnail image if available (may be NotFound, BadRequest or Forbidden)
-    """
-
     # Ensure request is authorised
     if not permissions.FileserverPermission().has_permission(request):
         return http.HttpResponseForbidden()
 
+    is_scan = "scans" in request.path
+
     # Get file, ensure it exists and is an image
-    file_qs = models.File.objects.filter(id=kwargs["file_id"])
+    file_qs = (models.Scan if is_scan else models.File).objects.filter(id=kwargs["file_id"])
     if file_qs.exists():
         file = file_qs.first()
         if not os.path.isfile(file.get_real_path()):
             return http.HttpResponseNotFound()
 
-        if file.type == "image":
+        if is_scan or file.type == "image":
             # Load exif thumbnail
             exif = piexif.load(file.get_real_path())
             data = exif["thumbnail"]
@@ -221,20 +169,8 @@ def image_thumb_view(request, *args, **kwargs):
         return http.HttpResponseNotFound()
 
 
+# Provide saved thumbnail image for face
 def face_view(request, *args, **kwargs):
-    """ Provide the saved thumbnail image data for a face
-
-    Parameters
-    ----------
-    face_id : int
-        The ID of the face
-
-    Returns
-    -------
-    HttpResponse(content_type="image/jpeg")
-        The response image if available (may be NotFound or Forbidden)
-    """
-
     # Ensure request is authorised
     if not permissions.FileserverPermission().has_permission(request):
         return http.HttpResponseForbidden()
@@ -258,13 +194,8 @@ def face_view(request, *args, **kwargs):
         return http.HttpResponseNotFound()
 
 
+# File API, with filtering by folder/album, searching and pagination
 class FileViewSet(viewsets.ModelViewSet):
-    """ File model viewset
-
-    Provides all information about files.
-    Does not provide actual image data.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.FileSerializer
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
@@ -272,182 +203,42 @@ class FileViewSet(viewsets.ModelViewSet):
     queryset = models.File.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
     pagination_class = filters.CustomPagination
-    """ def get_queryset(self):
-        if self.action == "list":
-            serializer = serializers.FileSerializer(context=self.get_serializer_context())
-            files = serializer.extract_files(models.File.objects.all())
-            return files
-        else:
-            return models.File.objects.all() """
 
 
+# Folder API, with filtering by parent and searching
 class FolderViewSet(viewsets.ReadOnlyModelViewSet):
-    """ Folder model viewset
-
-    Provides simple folder data when listed.
-    For single retrieve, provides IDs of all child files and folders.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
+    serializer_class = serializers.FolderSerializer
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all()
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
-    """ def get_queryset(self):
-        if self.action == "list":
-            return models.Folder.objects.filter(parent=None)
-        else:
-            return models.Folder.objects.all() """
-    def get_serializer_class(self):
-        """ Return different serializers for list and retrieve """
-
-        if self.action == "retrieve":
-            return serializers.FolderSerializer
-        else:
-            return serializers.FolderListSerializer
-
-    """ def list(self, request, *args, **kwargs):
-        if "query" in self.request.query_params:
-            folder = models.Folder.get_from_path(self.request.query_params["query"])
-            if folder:
-                self.kwargs[self.lookup_field] = folder.id
-                self.action = "retrieve"
-                return self.retrieve(request, *args, **kwargs)
-            else:
-                raise http.Http404()
-        else:
-            return super(FolderViewSet, self).list(request, *args, **kwargs) """
 
 
-""" # Folder files API
-class FolderFileViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = (permissions.FileserverPermission,)
-    serializer_class = serializers.FileSerializer
-    # queryset = models.File.objects.all()
-
-    def get_queryset(self):
-        folder_qs = models.Folder.objects.filter(id=self.kwargs["folder_pk"])
-
-        if folder_qs.exists():
-            folder = folder_qs.first()
-            isf = (self.request.query_params["isf"].lower() == "true") if "isf" in self.request.query_params else False
-            serializer = serializers.FolderSerializer(context=self.get_serializer_context())
-            files = serializer.extract_files(folder.get_files(isf))
-
-            return files
-        else:
-            raise http.Http404("Folder doesn't exist") """
-
-
+# Album API
 class AlbumViewSet(viewsets.ModelViewSet):
-    """ Album model viewset
-
-    Provides simple album data when listed.
-    For single retrieve, provides IDs of all contained files.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
+    serializer_class = serializers.AlbumSerializer
     queryset = models.Album.objects.all()
-    """ def get_queryset(self):
-        if self.action == "list":
-            return models.Album.objects.all()  # .filter(parent=None)
-        else:
-            return models.Album.objects.all() """
-    def get_serializer_class(self):
-        """ Return different serializers for list and retrieve """
-
-        if self.action == "retrieve":
-            return serializers.AlbumSerializer
-        else:
-            return serializers.AlbumListSerializer
-
-    """ def list(self, request, *args, **kwargs):
-        if "query" in request.query_params:
-            album = models.Album.get_from_path(request.query_params["query"])
-            if album:
-                self.kwargs[self.lookup_field] = album.id
-                self.action = "retrieve"
-                return self.retrieve(request, *args, **kwargs)
-            else:
-                raise http.Http404()
-        else:
-            return super(AlbumViewSet, self).list(request, *args, **kwargs) """
 
 
+# Album-File API (for adding/removing files from albums)
 class AlbumFileViewSet(viewsets.ModelViewSet):
-    """ AlbumFile model viewset
-
-    Allows creation and deletion of Album-File relationships
-    Can be filtered by album and/or file
-    """
-
     permission_classes = (permissions.FileserverPermission, )
     queryset = models.AlbumFile.objects.all()
     serializer_class = serializers.AlbumFileSerializer
     filter_class = filters.AlbumFileFilter
 
 
+# Person API
 class PersonViewSet(viewsets.ModelViewSet):
-    """ Person model viewset
-
-    Provides simple person data when listed.
-    For single retrieve, provides IDs of all associated faces.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
+    serializer_class = serializers.PersonSerializer
     http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     queryset = models.Person.objects.all()
-    """ def get_queryset(self):
-        return models.Person.objects.all() """
-    def get_serializer_class(self):
-        """ Return different serializers for list and retrieve """
-
-        if self.action == "retrieve":
-            return serializers.PersonSerializer
-        else:
-            return serializers.PersonListSerializer
-
-    """ def list(self, request, *args, **kwargs):
-        if "query" in request.query_params:
-            person_qs = models.Person.objects.filter(full_name=request.query_params["query"].rstrip("/"))
-            if person_qs:
-                person = person_qs.first()
-                self.kwargs[self.lookup_field] = person.id
-                self.action = "retrieve"
-                return self.retrieve(request, *args, **kwargs)
-            else:
-                raise http.Http404()
-        else:
-            return super(PersonViewSet, self).list(request, *args, **kwargs) """
 
 
-# Person faces API TODO decide if this is still necessary
-""" class PersonFaceViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = (permissions.FileserverPermission,)
-    serializer_class = serializers.FaceSerializer
-
-    def get_queryset(self):
-        person_qs = models.Person.objects.filter(id=self.kwargs["person_pk"])
-
-        if person_qs.exists():
-            person = person_qs.first()
-            serializer = serializers.PersonSerializer(context=self.get_serializer_context())
-            faces = serializer.extract_files(person.get_faces())
-
-            return faces
-        else:
-            raise http.Http404("Person doesn't exist") """
-
-# NOTE: can change person group with PATCH to person
-# TODO create faces API for changing their person (and potentially more features later?)
-
-
+# Face API, with filtering by person and pagination
 class FaceViewSet(viewsets.ModelViewSet):
-    """ Face model viewset
-
-    Provides all data about faces, as list or single retrieve.
-    Also allows modification.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
@@ -456,13 +247,8 @@ class FaceViewSet(viewsets.ModelViewSet):
     pagination_class = filters.CustomPagination
 
 
-# PersonGroups API
+# PersonGroup API
 class PersonGroupViewSet(viewsets.ModelViewSet):
-    """ PersonGroup model viewset
-
-    Provides data about people groups, and allows modification.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
     http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.PersonGroupSerializer
@@ -471,11 +257,23 @@ class PersonGroupViewSet(viewsets.ModelViewSet):
 
 # GeoTagArea API
 class GeoTagAreaViewSet(viewsets.ModelViewSet):
-    """ GeoTagArea model viewset
-
-    Provides data about geotag areas, and allows modification.
-    """
-
     permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.GeoTagAreaSerializer
     queryset = models.GeoTagArea.objects.all()
+
+
+# ScanFolder API, with filtering by parent
+class ScanFolderViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = (permissions.FileserverPermission, )
+    serializer_class = serializers.ScanFolderSerializer
+    filter_class = filters.ScanFolderFilter
+    queryset = models.ScanFolder.objects.all()
+
+
+# Scan API, with filtering by parent and pagination
+class ScanViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = (permissions.FileserverPermission, )
+    serializer_class = serializers.ScanSerializer
+    filter_class = filters.ScanFilter
+    queryset = models.Scan.objects.all()
+    pagination_class = filters.CustomPagination

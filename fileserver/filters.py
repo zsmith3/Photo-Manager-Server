@@ -9,45 +9,31 @@ from . import utils
 BACKEND = filters.backends.RestFrameworkFilterBackend
 
 
+# Filter albums by by ID(s) (used within FileFilter)
 class AlbumFilter(filters.FilterSet):
-    """ Filter set for Album model, for use within FileFilter
-
-    Fields
-    ------
-    `id` : `exact`, `in`
-        Fetches album(s) by ID
-    """
     class Meta:
         model = models.Album
         fields = {"id": ["exact", "in"]}
 
 
-class FileFilter(filters.FilterSet):
-    """ Filter set for File model
-
-    Fields
-    ------
-    `folder` : `exact`, `in`
-        Fetches files contained in a folder (or set of folders)
-    `album` : `exact`
-        Fetches files contained in an album and its children
-    `isf` : bool
-        If true, and a folder has been specified, all files from subfolders will also be included
-    """
-
-    album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
-
+# Filter files/scan-files by folder(s) (with isf option to include files from subfolders)
+class BaseFileFilter(filters.FilterSet):
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         if "folder" in data and "isf" in data and data["isf"] in ["true", "1"]:
             folder_id = data["folder"]
-            folder_qs = models.Folder.objects.filter(id=folder_id)
+            folder_qs = self.folder_cls().objects.filter(id=folder_id)
             if folder_qs.exists():
                 folder = folder_qs.first()
                 all_folders = [folder] + list(folder.get_children(True))
                 data = {key: data[key] for key in data if key != "folder"}
                 data["folder__in"] = ",".join([str(folder.id) for folder in all_folders])
 
-        return super(FileFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
+        return super(BaseFileFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
+
+
+# Filter files by folder(s)/album
+class FileFilter(BaseFileFilter):
+    album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
 
     def filter_album(self, qs, name, value):
         all_files = value.get_files()
@@ -59,22 +45,12 @@ class FileFilter(filters.FilterSet):
         fields = {"folder": ["exact", "in"]}
 
 
-class FolderFilter(filters.FilterSet):
-    """ Filter set for Folder model
-
-    Fields
-    ------
-    `id` : `in`
-        Used internally to fetch full subfolder tree
-    `parent` : `exact`, `isnull`
-        Fetches subfolders for a folder, or root folders
-    `isf` : bool
-        If true, and a parent folder has been specified, the full subfolder tree will be fetched
-    """
+# Filter folders/scan-folders by ID/parent (with isf option to include subfolders)
+class BaseFolderFilter(filters.FilterSet):
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         if "parent" in data and "isf" in data and data["isf"] in ["true", "1"]:
             parent_id = data["parent"]
-            parent_qs = models.Folder.objects.filter(id=parent_id)
+            parent_qs = self.folder_cls().objects.filter(id=parent_id)
             if parent_qs.exists():
                 parent = parent_qs.first()
                 all_folders = list(parent.get_children(True))
@@ -84,23 +60,18 @@ class FolderFilter(filters.FilterSet):
                 else:
                     data["id__in"] = "-1"
 
-        return super(FolderFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
+        return super(BaseFolderFilter, self).__init__(data, queryset, relationship=relationship, **kwargs)
 
+
+# Standard file folder filter
+class FolderFilter(BaseFolderFilter):
     class Meta:
         model = models.Folder
         fields = {"id": ["in"], "parent": ["exact", "isnull"]}
 
 
+# Filter faces by person/status
 class FaceFilter(filters.FilterSet):
-    """ Filter set for Face model
-
-    Fields
-    ------
-    `person` : `exact`
-        Fetches faces for a given person
-    `status` : `exact`, `lt`, `gt`
-        Used to ignore unwanted faces (defaults to less than 4)
-    """
     def __init__(self, data=None, *args, **kwargs):
         # Default to status=lt__4
         if data is not None:
@@ -121,17 +92,8 @@ class FaceFilter(filters.FilterSet):
         fields = {"person": ["exact"], "status": ["exact", "lt", "gt"]}
 
 
+# Filter album-file relationships by file/album (includes children of album)
 class AlbumFileFilter(filters.FilterSet):
-    """ Filter set for AlbumFile model
-
-    Fields
-    ------
-    `file` : `exact`
-        Restricts relationships to a specific file
-    `album` : `exact`
-        Finds relationships with album or its children
-    """
-
     album = filters.RelatedFilter(AlbumFilter, field_name="album", queryset=models.Album.objects.all(), method="filter_album")
 
     def filter_album(self, qs, name, value):
@@ -143,11 +105,22 @@ class AlbumFileFilter(filters.FilterSet):
         fields = {"file": ["exact"]}
 
 
-class CustomSearchFilter(drf_filters.SearchFilter):
-    """ Filter class for custom file-searching method
+# Scan file folder filter
+class ScanFolderFilter(BaseFolderFilter):
+    class Meta:
+        model = models.ScanFolder
+        fields = {"id": ["in"], "parent": ["exact", "isnull"]}
 
-    Works on File and Folder models.
-    """
+
+# Filter scan files by folder(s)
+class ScanFilter(BaseFileFilter):
+    class Meta:
+        model = models.Scan
+        fields = {"folder": ["exact", "in"]}
+
+
+# Custom search method (for File and Folder models)
+class CustomSearchFilter(drf_filters.SearchFilter):
     def filter_queryset(self, request, queryset, view):
         # Get search query and split into words, sorted by importance (length)
         search_query = request.query_params.get(self.search_param, "").lower()
@@ -187,8 +160,7 @@ class CustomSearchFilter(drf_filters.SearchFilter):
         return all_files
 
 
+# Pagination class (with variable page size)
 class CustomPagination(pagination.PageNumberPagination):
-    """ Pagination class which allows for variable page size """
-
     page_size = 100
     page_size_query_param = "page_size"
