@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from . import models, utils
+from . import models, utils, scancrop
 
 
 # GeoTag serializer
@@ -125,7 +125,29 @@ class ScanFolderSerializer(serializers.ModelSerializer):
 
 # Scan serializer
 class ScanSerializer(serializers.ModelSerializer):
+    lines = serializers.ListField(write_only=True)
+    confirm = serializers.BooleanField(write_only=True)
+    rects = serializers.ListField(read_only=True)
+
     class Meta:
         model = models.Scan
-        fields = ("id", "name", "format", "folder", "width", "height", "orientation")
-        extra_kwargs = {field: {"read_only": True} for field in fields}
+        fields = ("id", "name", "format", "folder", "width", "height", "orientation", "lines", "confirm", "rects")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["lines", "confirm"]}
+
+    def validate(self, attrs):
+        if "lines" in attrs:
+            for line in attrs["lines"]:
+                if "axis" not in line or line["axis"] not in [0, 1]:
+                    raise serializers.ValidationError({"lines": "Error in 'axis' field on some line(s)."})
+                if "pos" not in line or not isinstance(line["pos"], int):
+                    raise serializers.ValidationError({"lines": "Error in 'pos' field on some line(s)."})
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        if "lines" in validated_data:
+            lines = validated_data.pop("lines")
+            rects = scancrop.get_image_rects(instance.get_real_path(), lines, instance.width, instance.height)
+            instance.rects = rects
+
+        return super(ScanSerializer, self).update(instance, validated_data)

@@ -271,8 +271,9 @@ class ScanFolderViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # Scan API, with filtering by parent and pagination
-class ScanViewSet(viewsets.ReadOnlyModelViewSet):
+class ScanViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.FileserverPermission, )
+    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.ScanSerializer
     filter_class = filters.ScanFilter
     queryset = models.Scan.objects.all()
