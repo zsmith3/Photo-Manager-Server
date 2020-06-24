@@ -23,7 +23,7 @@ import face_recognition
 from sklearn import neighbors
 
 # Local imports
-from . import utils
+from . import scancrop, utils
 from .membership.models import *
 
 # Allow very large images to be read
@@ -961,6 +961,7 @@ class ScanRootFolder(models.Model):
 
     name = models.TextField()
     real_path = models.TextField()
+    output_folder = models.ForeignKey(Folder, on_delete=models.PROTECT, related_name="+")
     folder = models.OneToOneField("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
 
     # Create attached ScanFolder model when created
@@ -979,6 +980,7 @@ class ScanRootFolder(models.Model):
         try:
             self.folder.scan_filesystem()
             self.folder.prune_database()
+            self.folder.generate_output_tree(self.output_folder)
         except Exception:
             utils.log(traceback.format_exc())
 
@@ -997,7 +999,19 @@ class ScanFolder(BaseFolder):
     history = HistoricalRecords()
 
     name = models.TextField()
+    output_folder = models.ForeignKey(Folder, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
     parent = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
+
+    # Generate all output folders
+    def generate_output_tree(self, output_folder):
+        self.output_folder = output_folder
+        self.save()
+        for child in ScanFolder.objects.filter(parent=self):
+            output_path = output_folder.get_real_path() + child.name.strip("/") + "/"
+            if not os.path.isdir(output_path):
+                os.mkdir(output_path)
+            new_folder = Folder.from_fs(child.name.strip(), output_folder)
+            child.generate_output_tree(new_folder)
 
 
 # Scan model for scanned photograph image files
@@ -1007,6 +1021,7 @@ class Scan(models.Model):
     name = models.TextField(null=True)
     format = models.TextField(null=True)
     folder = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+")
+    done_output = models.BooleanField(default=False)
 
     width = models.PositiveIntegerField(null=True)
     height = models.PositiveIntegerField(null=True)
@@ -1015,6 +1030,22 @@ class Scan(models.Model):
     # Get full local filesystem file path
     def get_real_path(self):
         return self.folder.get_real_path() + self.name + "." + self.format
+
+    # Get (real) path to save cropped photos
+    def get_output_path(self):
+        return self.folder.output_folder.get_real_path() + self.name
+
+    # Get locations of photos given crop lines
+    def get_image_rects(self, lines):
+        return scancrop.get_image_rects(self.get_real_path(), lines, self.width, self.height)
+
+    # Save cropped images given crop lines
+    def confirm_crop(self, lines):
+        output_fns = scancrop.save_images(self.get_real_path(), lines, self.width, self.height, self.get_output_path())
+        for fn in output_fns:
+            File.from_fs(fn, self.folder.output_folder)
+        self.done_output = True
+        self.save()
 
     # Add Scan file to database from local filesystem (detects existing if unmoved)
     @staticmethod

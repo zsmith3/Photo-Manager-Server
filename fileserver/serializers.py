@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from . import models, utils, scancrop
+from . import models
 
 
 # GeoTag serializer
@@ -147,7 +147,12 @@ class ScanSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if "lines" in validated_data:
             lines = validated_data.pop("lines")
-            rects = scancrop.get_image_rects(instance.get_real_path(), lines, instance.width, instance.height)
-            instance.rects = rects
+            if "confirm" in validated_data:
+                if validated_data["confirm"]:
+                    instance.confirm_crop(lines)
+                validated_data.pop("confirm")
+            else:
+                rects = instance.get_image_rects(lines)
+                instance.rects = rects
 
         return super(ScanSerializer, self).update(instance, validated_data)

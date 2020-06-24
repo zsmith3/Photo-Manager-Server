@@ -242,11 +242,11 @@ def get_rect_image(image, bounds, step, threshold, error, requirement):
 
     quadrilateral = sum(points, ())
 
-    quadImage = image.transform((width, height), Image.QUAD, quadrilateral, Image.BICUBIC)
+    quad_image = image.transform((width, height), Image.QUAD, quadrilateral, Image.BICUBIC)
 
-    finalImage = remove_margins(quadImage, {"post-margin-color": 0.75, "post-margin-size": 10, "post-margin-pct": 40})
+    final_image = remove_margins(quad_image, {"post-margin-color": 0.75, "post-margin-size": 10, "post-margin-pct": 40})
 
-    return finalImage
+    return final_image
 
 
 # Get locations of all photos given cropping lines
@@ -277,3 +277,27 @@ def get_image_rects(filename, lines, width, height):
             img_rects.append([(p[0] + rect_x1, p[1] + rect_y1) for p in rect_points])
 
     return img_rects
+
+
+# Save photos found with given cropping lines to image files
+def save_images(filename, lines, width, height, output):
+    rects = get_rects_from_lines(lines, width, height)
+    # TODO options
+    bounds = (1 / 40, 1 / 40)
+    step = (1 / 100, 1 / 100)
+    threshold = 2
+    error = 1 / 100
+    requirement = 50
+
+    page = Image.open(filename)
+
+    out_fns = []
+    for rect in rects:
+        img_crop = page.crop((rect[0] * page.width, rect[1] * page.height, rect[2] * page.width, rect[3] * page.height))
+        final_img = get_rect_image(img_crop, bounds, step, threshold, error, requirement)
+        if final_img:
+            output_fn = output + "_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[len(out_fns)] + ".jpg"
+            final_img.save(output_fn, format="JPEG", subsampling=0, quality=100)
+            out_fns.append(output_fn.split("/")[-1])
+
+    return out_fns

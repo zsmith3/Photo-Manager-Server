@@ -114,9 +114,24 @@ class ScanFolderFilter(BaseFolderFilter):
 
 # Filter scan files by folder(s)
 class ScanFilter(BaseFileFilter):
+    def __init__(self, data=None, *args, **kwargs):
+        # Default to done_output=False
+        if data is not None:
+            data = data.copy()
+
+            done = False
+            for name in data:
+                if "done_output" in name:
+                    done = True
+
+            if not done:
+                data["done_output"] = False
+
+        super(ScanFilter, self).__init__(data, *args, **kwargs)
+
     class Meta:
         model = models.Scan
-        fields = {"folder": ["exact", "in"]}
+        fields = {"folder": ["exact", "in"], "done_output": ["exact"]}
 
 
 # Custom search method (for File and Folder models)
