@@ -1036,12 +1036,12 @@ class Scan(models.Model):
         return self.folder.output_folder.get_real_path() + self.name
 
     # Get locations of photos given crop lines
-    def get_image_rects(self, lines):
-        return scancrop.get_image_rects(self.get_real_path(), lines, self.width, self.height)
+    def get_image_rects(self, lines, options):
+        return scancrop.get_image_rects(self.get_real_path(), lines, self.width, self.height, options)
 
     # Save cropped images given crop lines
-    def confirm_crop(self, lines):
-        output_fns = scancrop.save_images(self.get_real_path(), lines, self.width, self.height, self.get_output_path())
+    def confirm_crop(self, lines, options):
+        output_fns = scancrop.save_images(self.get_real_path(), lines, self.width, self.height, options, self.get_output_path())
         for fn in output_fns:
             File.from_fs(fn, self.folder.output_folder)
         self.done_output = True

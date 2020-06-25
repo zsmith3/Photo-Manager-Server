@@ -126,13 +126,14 @@ class ScanFolderSerializer(serializers.ModelSerializer):
 # Scan serializer
 class ScanSerializer(serializers.ModelSerializer):
     lines = serializers.ListField(write_only=True)
+    crop_options = serializers.DictField(write_only=True)
     confirm = serializers.BooleanField(write_only=True)
     rects = serializers.ListField(read_only=True)
 
     class Meta:
         model = models.Scan
-        fields = ("id", "name", "format", "folder", "width", "height", "orientation", "lines", "confirm", "rects")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["lines", "confirm"]}
+        fields = ("id", "name", "format", "folder", "width", "height", "orientation", "lines", "crop_options", "confirm", "rects")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["lines", "crop_options", "confirm"]}
 
     def validate(self, attrs):
         if "lines" in attrs:
@@ -147,12 +148,13 @@ class ScanSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if "lines" in validated_data:
             lines = validated_data.pop("lines")
+            options = validated_data["crop_options"] if "crop_options" in validated_data else {}
             if "confirm" in validated_data:
                 if validated_data["confirm"]:
-                    instance.confirm_crop(lines)
+                    instance.confirm_crop(lines, options)
                 validated_data.pop("confirm")
             else:
-                rects = instance.get_image_rects(lines)
+                rects = instance.get_image_rects(lines, options)
                 instance.rects = rects
 
         return super(ScanSerializer, self).update(instance, validated_data)

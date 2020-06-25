@@ -250,14 +250,9 @@ def get_rect_image(image, bounds, step, threshold, error, requirement):
 
 
 # Get locations of all photos given cropping lines
-def get_image_rects(filename, lines, width, height):
+def get_image_rects(filename, lines, width, height, options):
+    options = {**DEFAULT_OPTIONS, **options}
     rects = get_rects_from_lines(lines, width, height)
-    # TODO options
-    bounds = (1 / 40, 1 / 40)
-    step = (1 / 100, 1 / 100)
-    threshold = 2
-    error = 1 / 100
-    requirement = 50
 
     page = Image.open(filename)
 
@@ -266,13 +261,13 @@ def get_image_rects(filename, lines, width, height):
     for rect in rects:
         rect_w = (rect[2] - rect[0]) * page.width
         rect_h = (rect[3] - rect[1]) * page.height
-        rect_x1 = rect[0] * page.width + bounds[0] * rect_w
-        rect_x2 = rect[2] * page.width - bounds[0] * rect_w
-        rect_y1 = rect[1] * page.height + bounds[1] * rect_h
-        rect_y2 = rect[3] * page.height - bounds[1] * rect_h
+        rect_x1 = rect[0] * page.width + options["bounds"][0] * rect_w
+        rect_x2 = rect[2] * page.width - options["bounds"][0] * rect_w
+        rect_y1 = rect[1] * page.height + options["bounds"][1] * rect_h
+        rect_y2 = rect[3] * page.height - options["bounds"][1] * rect_h
         image = page.crop((rect_x1, rect_y1, rect_x2, rect_y2))
 
-        rect_points, _w, _h = get_rect_points(image, step, threshold, error, requirement)
+        rect_points, _w, _h = get_rect_points(image, options["step"], options["threshold"], options["error"], options["requirement"])
         if rect_points:
             img_rects.append([(p[0] + rect_x1, p[1] + rect_y1) for p in rect_points])
 
@@ -280,24 +275,22 @@ def get_image_rects(filename, lines, width, height):
 
 
 # Save photos found with given cropping lines to image files
-def save_images(filename, lines, width, height, output):
+def save_images(filename, lines, width, height, options, output):
+    options = {**DEFAULT_OPTIONS, **options}
     rects = get_rects_from_lines(lines, width, height)
-    # TODO options
-    bounds = (1 / 40, 1 / 40)
-    step = (1 / 100, 1 / 100)
-    threshold = 2
-    error = 1 / 100
-    requirement = 50
 
     page = Image.open(filename)
 
     out_fns = []
     for rect in rects:
         img_crop = page.crop((rect[0] * page.width, rect[1] * page.height, rect[2] * page.width, rect[3] * page.height))
-        final_img = get_rect_image(img_crop, bounds, step, threshold, error, requirement)
+        final_img = get_rect_image(img_crop, options["bounds"], options["step"], options["threshold"], options["error"], options["requirement"])
         if final_img:
             output_fn = output + "_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[len(out_fns)] + ".jpg"
             final_img.save(output_fn, format="JPEG", subsampling=0, quality=100)
             out_fns.append(output_fn.split("/")[-1])
 
     return out_fns
+
+
+DEFAULT_OPTIONS = {"bounds": (1 / 40, 1 / 40), "step": (1 / 100, 1 / 100), "threshold": 2, "error": 1 / 100, "requirement": 50}
