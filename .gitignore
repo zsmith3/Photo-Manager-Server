@@ -2,12 +2,8 @@
 .vscode
 **/__pycache__/**
 
-# Ignore database and migrations
+# Ignore database
 *.sqlite3
-**/migrations/*
-
-# Commit default data setup migration
-!migrations/setup_data.py
 
 # User-specific settings
 **/settings/user.py
