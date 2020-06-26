@@ -23,290 +23,113 @@ import face_recognition
 from sklearn import neighbors
 
 # Local imports
-from . import utils
+from . import scancrop, utils
 from .membership.models import *
 
 # Allow very large images to be read
 Image.MAX_IMAGE_PIXELS = None
 
 # Global Haar cascades dict
-cascades = {}
+cascades = None
 
 
+# Override default display name for models
+def default_str(self):
+    return self.name if hasattr(self, "name") else self.id
+
+
+models.Model.__str__ = default_str
+
+
+# Base class for Folder and ScanFolder models
 class BaseFolder(models.Model):
-    """ Abstract base class for Folder and RootFolder """
     class Meta:
         abstract = True
 
+    # Total file count (includes subfolders)
     @property
     def file_count(self):
-        """ Number of files in folder
-
-        Includes all files in subfolders.
-
-        Returns
-        -------
-        int
-            Total file count
-        """
-
-        subfolder_count = sum([folder.file_count for folder in Folder.objects.filter(parent=self.get_folder_instance())])
-        file_count = File.objects.filter(folder=self.get_folder_instance()).count()
+        subfolder_count = sum([folder.file_count for folder in self.folder_cls().objects.filter(parent=self)])
+        file_count = self.file_cls().objects.filter(folder=self).count()
         return subfolder_count + file_count
 
-    @property
-    def length(self):
-        """ Size of folder
-
-        Given in bytes, includes all files in top-level folder and subfolders.
-
-        Returns
-        -------
-        int
-            Total size (bytes)
-        """
-
-        subfolder_length = sum(folder.length for folder in Folder.objects.filter(parent=self.get_folder_instance()))
-        file_length = File.objects.filter(folder=self.get_folder_instance()).aggregate(models.Sum("length"))["length__sum"] or 0
-        return subfolder_length + file_length
-
+    # List filenames from local filesystem
     def get_fs_filenames(self):
-        """ Get filenames in folder from local filesystem
-
-        Returns
-        -------
-        list of str
-            List of filenames (not full paths)
-        """
-
         return os.listdir(self.get_real_path())
 
+    # Scan system for new files
     def scan_filesystem(self):
-        """ Scan the local filesystem for new files
-
-        Recursively scans the full tree at the real location of this folder,
-        adding any files to the database which are not already present.
-        Also detects movement of existing files, provided they are still within the Root Folder.
-        """
-
         utils.log("Scanning folder: %s" % self.name)
         real_path = self.get_real_path()
         files = self.get_fs_filenames()
         for filename in files:
             if os.path.isdir(real_path + filename):
-                Folder.from_fs(filename, self.get_folder_instance())
+                self.folder_cls().from_fs(filename, self)
             else:
-                File.from_fs(filename, self.get_folder_instance())
+                self.file_cls().from_fs(filename, self)
 
+    # Clear deleted files from database
     def prune_database(self):
-        """ Clear deleted files/folders from the database
-
-        Recursively finds and removes from the database any files/folders in this folder which are not found in their expected filesystem location.
-        This should only be run after running scan_filesystem, as it will not detect file movements.
-        """
-
         utils.log("Pruning database of folder: %s" % self.name)
 
         # Prune subfolders
-        folders = Folder.objects.filter(parent=self.get_folder_instance())
+        folders = self.folder_cls().objects.filter(parent=self)
         for folder in folders:
             folder.prune_database()
 
         # Prune top-level files
-        files = File.objects.filter(folder=self.get_folder_instance())
+        files = self.file_cls().objects.filter(folder=self)
         for file in files:
             if not os.path.isfile(file.get_real_path()):
-                utils.log("Clearing file from database: %s/%s" % (self.name, file.file_id))
+                utils.log("Clearing file from database: %s/%s" % (self.name, file.name))
                 file.delete()
 
         # Delete self if needed
         if not os.path.isdir(self.get_real_path()):
-            if "folder" in self.__dict__:
-                self.folder.delete()
             self.delete()
 
-    def detect_faces(self):
-        """ Detect faces in image files in the folder (and subfolders)
-
-        Recursively scans all files in subfolders which have not already been marked as scanned. Uses Haar cascades provided by OpenCV.
-        """
-
-        utils.log("Detecting faces in folder: %s" % self.name)
-
-        # Load cascades if needed
-        if isinstance(self, RootFolder):
-            global cascades
-            cascades["face"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
-            cascades["eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
-            cascades["left_eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_lefteye_2splits.xml")
-            cascades["right_eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_righteye_2splits.xml")
-
-        # Detect faces in subfolders
-        folders = Folder.objects.filter(parent=self.get_folder_instance())
-        for folder in folders:
-            folder.detect_faces()
-
-        # Detect faces in top-level files
-        files = File.objects.filter(folder=self.get_folder_instance())
-        for file in files:
-            file.detect_faces()
-
-
-class Folder(BaseFolder):
-    """ Folder model
-
-    Attributes
-    ----------
-    name : TextField
-        Name of the folder
-    parent : ForeignKey(Folder)
-        Parent folder
-    """
-
-    history = HistoricalRecords()
-
-    name = models.TextField()
-    parent = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
-
-    @staticmethod
-    def get_from_path(path):
-        """ Find a folder from its path
-
-        Parameters
-        -------
-        path : str
-            The exact virtual path to the folder.
-
-        Returns
-        -------
-        Folder or None
-            The Folder instance found, or None if not found
-        """
-
-        folders = Folder.objects.all()
-
-        for folder in folders:
-            if folder.path == path:
-                return folder
-
-        return None
-
-    @staticmethod
-    def from_fs(name, parent):
-        """ Load a folder into the database from the filesystem
-
-        Recursively loads all files, including subfolder contents.
-
-        Parameters
-        -------
-        name : str
-            The name of the new folder.
-        parent : Folder
-            The (already created) parent Folder instance.
-
-        Returns
-        -------
-        Folder
-            The newly created Folder instance
-        """
-
+    # Add folder to database from filesystem
+    @classmethod
+    def from_fs(cls, name, parent):
         # Create folder if needed
-        folder_qs = Folder.objects.filter(name=name, parent=parent)
+        folder_qs = cls.objects.filter(name=name, parent=parent)
         if folder_qs.exists():
             folder = folder_qs.first()
         else:
-            folder = Folder.objects.create(name=name, parent=parent)
+            folder = cls.objects.create(name=name, parent=parent)
 
         # Recursively load folder contents
         folder.scan_filesystem()
 
         return folder
 
-    def __str__(self):
-        return self.name
-
-    def get_folder_instance(self):
-        """ Return self for standard folders
-
-        This method exists to make Folder interchangeable with RootFolder.
-
-        Returns
-        -------
-        Folder
-            self
-        """
-        return self
-
+    # Virtual path to folder (found recursively)
     @property
     def path(self):
-        """ Full (virtual) path to the folder
-
-        Includes both the Root Folder name and name of this folder.
-        Does not include the real filesystem location.
-
-        Returns
-        -------
-        str
-            Virtual path to folder
-        """
-
         if self.parent is None:
             return self.name.rstrip("/") + "/"
         else:
             return self.parent.path + self.name.strip("/") + "/"
 
+    # Full local filesystem path to folder
     def get_real_path(self):
-        """ Get the full (real) path to the folder in the local filesystem
-
-        Returns
-        -------
-        str
-            Real path to folder
-        """
-
         if self.parent is None:
-            return RootFolder.objects.filter(folder=self).first().get_real_path()
+            return self.root_folder_cls().objects.filter(folder=self).first().get_real_path()
         else:
             return self.parent.get_real_path() + self.name.strip("/") + "/"
 
+    # Get child folders
     def get_children(self, include_subfolders):
-        """ Get subfolders in folder
-
-        Parameters
-        -------
-        include_subfolders : bool
-            If False, only top-level subfolders will be included. If True, they will be scanned recursively for all descendants.
-
-        Returns
-        -------
-        QuerySet of Folder
-            Set of child Folder instances
-        """
-
-        children = Folder.objects.filter(parent=self)
+        children = self.folder_cls().objects.filter(parent=self)
         if include_subfolders:
             return functools.reduce(operator.or_, (child.get_children(True) for child in children), children)
         else:
             return children
 
+    # Get files
     def get_files(self, include_subfolders=False, queryset=None):
-        """ Get Files in folder
-
-        Parameters
-        -------
-        include_subfolders : bool
-            If False, only top-level files will be included.
-            If True, subfolders will be scanned recursively for all files.
-            Defaults to False.
-
-        Returns
-        -------
-        QuerySet of File
-            Set of Files in folder
-        """
-
         if queryset is None:
-            queryset = File.objects
+            queryset = self.file_cls().objects
 
         files = queryset.filter(folder=self)
         if include_subfolders:
@@ -315,69 +138,78 @@ class Folder(BaseFolder):
             return files
 
 
-class RootFolder(BaseFolder):
-    """ Root Folder model
+# Model for representing folders in virtual filesystem
+class Folder(BaseFolder):
+    # Class information for BaseFolder methods
+    root_folder_cls = lambda s: RootFolder
+    folder_cls = lambda s: Folder
+    file_cls = lambda s: File
 
-    Attributes
-    ----------
-    name : TextField
-        Name of the root folder
-    real_path : TextField
-        Real path to folder in local filesystem
-    folder : OneToOneField(Folder)
-        Reference to the standard Folder model instance attached to this
-    """
+    history = HistoricalRecords()
 
+    name = models.TextField()
+    parent = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
+
+    # Size in bytes (includes all files in subfolders)
+    @property
+    def length(self):
+        subfolder_length = sum(folder.length for folder in Folder.objects.filter(parent=self))
+        file_length = File.objects.filter(folder=self).aggregate(models.Sum("length"))["length__sum"] or 0
+        return subfolder_length + file_length
+
+    # Detect faces in files in folder
+    def detect_faces(self):
+        utils.log("Detecting faces in folder: %s" % self.name)
+
+        # Load cascades if needed
+        global cascades
+        if cascades is None:
+            cascades["face"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
+            cascades["eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
+            cascades["left_eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_lefteye_2splits.xml")
+            cascades["right_eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_righteye_2splits.xml")
+
+        # Detect faces in subfolders
+        folders = Folder.objects.filter(parent=self)
+        for folder in folders:
+            folder.detect_faces()
+
+        # Detect faces in top-level files
+        files = File.objects.filter(folder=self)
+        for file in files:
+            file.detect_faces()
+
+
+# Model for representing root folders
+class RootFolder(models.Model):
     history = HistoricalRecords()
 
     name = models.TextField()
     real_path = models.TextField()
     folder = models.OneToOneField("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
 
+    # Create an attached Folder model upon creation
     @classmethod
     def post_create(cls, sender, instance, created, *args, **kwargs):
-        """ Create attached Folder model """
-
         if created:
             instance.folder = Folder.objects.create(name=instance.name)
             instance.save()
 
-    def __str__(self):
-        return self.name
-
-    def get_folder_instance(self):
-        """ Return attached Folder instance
-
-        This method exists to make Folder interchangeable with RootFolder.
-
-        Returns
-        -------
-        Folder
-            self.folder
-        """
-
-        return self.folder
-
+    # Full local filesystem path to folder
     def get_real_path(self):
-        """ Get the full (real) path to the root folder in the local filesystem
-
-        Returns
-        -------
-        str
-            Real path to root folder
-        """
-
         return self.real_path.rstrip("/") + "/"
 
+    # Scan local filesystem for new files and remove deleted files
+    def scan_filesystem(self):
+        self.folder.scan_filesystem()
+        self.folder.prune_database()
+
+    # Detect faces in contained files
+    def detect_faces(self):
+        self.folder.detect_faces()
+
+    # Update all aspects of the database
     def update_database(self):
-        """ Run all database updates for this Root Folder
-
-        Scans the filesystem for new or moved files,
-        removes deleted files from the database,
-        detects any faces in unscanned image files
-        and attempts to recognize faces found.
-        """
-
         try:
             self.scan_filesystem()
             self.prune_database()
@@ -391,206 +223,73 @@ class RootFolder(BaseFolder):
 models.signals.post_save.connect(RootFolder.post_create, sender=RootFolder)
 
 
-# Album class
+# Album model into which files can be sorted (files can be added to multiple albums)
 class Album(models.Model):
-    """ Album model
-
-    Attributes
-    ----------
-    name : TextField
-        Name of the album
-    parent : ForeignKey(Album)
-        The parent album (None for root albums)
-    files : ManyToManyField(File)
-        A list of top-level files found in this album (not including those in child albums)
-    date_created : DateTimeField
-        The date upon which the album was first created
-    """
-
     history = HistoricalRecords()
 
     name = models.TextField()
     parent = models.ForeignKey("Album", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
     files = models.ManyToManyField("File", through="AlbumFile")
-    # created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     date_created = models.DateTimeField(auto_now_add=True)
 
-    @staticmethod
-    def get_from_path(path):
-        """ Find an album from its path
-
-        Returns
-        -------
-        Album or None
-            The Album instance found, or None if not found
-        """
-
-        albums = Album.objects.all()
-        path = path.rstrip("/") + "/"
-
-        for album in albums:
-            if album.path == path:
-                return album
-
-        return None
-
+    # Display name (path)
     def __str__(self):
         return self.path
 
+    # Path of album (found recursively)
     @property
     def path(self):
-        """ Full path to album
-
-        Returns
-        -------
-        str
-            Path to album
-        """
-
         if self.parent is None:
             return self.name + "/"
         else:
             return self.parent.path + self.name + "/"
 
+    # File count in album (including children)
     @property
     def file_count(self):
-        """ Number of files in the album (including its children)
-
-        Returns
-        -------
-        int
-            Number of files found
-        """
-
         return self.get_files().count()
 
+    # Get child albums
     def get_children(self, recurse=False):
-        """ Get child albums
-
-        Parameters
-        ----------
-        recurse : bool
-            If True, will recursively get all child albums.
-            If False, will only get top-level children.
-            Defaults to False.
-
-        Returns
-        -------
-        QuerySet of Album
-            Child albums
-        """
-
         children = Album.objects.filter(parent=self)
         if recurse:
             return functools.reduce(operator.or_, (child.get_children(True) for child in children), children)
         else:
             return children
 
+    # Get files in album (including children)
     def get_files(self):
-        """ Get all files in album (including its children)
-
-        Returns
-        -------
-        QuerySet of File
-            Full set of files
-        """
-
         all_files = self.files.all()
         return functools.reduce(operator.or_, (child.files.all() for child in self.get_children(True)), all_files)
 
+    # Get AlbumFile relationships for album and its children
     def get_file_rels(self):
-        """ Get all AlbumFile relationships associated with album and its children
-
-        Returns
-        -------
-        QuerySet of AlbumFile
-            Full set of AlbumFile relationships
-        """
-
         album_files = AlbumFile.objects.filter(album=self)
         return functools.reduce(operator.or_, (AlbumFile.objects.filter(album=child) for child in self.get_children(True)), album_files)
 
+    # Remove file from parent albums (before adding to this album, to avoid duplication)
     def remove_from_parents(self, to_remove):
-        """ Remove a file from parents of the album
-
-        This method is run before adding files to the album, to avoid duplication.
-
-        Parameters
-        -------
-        to_remove : File
-            The file to be removed
-        """
-
         if self.parent is not None:
             album_file_qs = AlbumFile.objects.filter(album=self.parent, file=to_remove)
             album_file_qs.delete()
             self.parent.remove_from_parents(to_remove)
 
 
+# Album-File relationship
 class AlbumFile(models.Model):
-    """ Album-File relationship model
-
-    Attributes
-    ----------
-    album : ForeignKey(Album)
-        The Album instance to which the File belongs
-    file : ForeignKey(File)
-        The File instance which belongs to the Album
-    date_added : DateTimeField
-        The date upon which the file was added to the album
-    """
-
     history = HistoricalRecords()
 
     album = models.ForeignKey(Album, on_delete=models.CASCADE, related_name="+")
     file = models.ForeignKey("File", on_delete=models.CASCADE, related_name="+")
-    # added_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     date_added = models.DateTimeField(auto_now_add=True)
 
+    # Display name (album and file)
     def __str__(self):
         return str(self.album) + " - " + str(self.file)
 
 
+# Main file model (for all formats)
 class File(models.Model):
-    """ File model
-
-    Attributes
-    ----------
-    file_id : CharField
-        The unique ID used as a local filename, based on the date taken/modified
-    name : TextField
-        The name (title) of the file (not the actual local filename)
-    folder : ForeignKey(Folder)
-        The Folder instance to which the file belongs
-    type : TextField({'file', 'image', 'video'})
-        The file type (as a broad category)
-    format : TextField
-        The file extension
-    length : PositiveIntegerField
-        The size (in bytes) of the file
-    is_starred : bool
-        Whether or not the file has been starred by a user
-    is_deleted : bool
-        Whether or not the file has been marked for deletion by a user
-    timestamp : DateTimeField
-        The date taken (if available) or date modified of the file
-    scanned_faces : BooleanField
-        Whether or not the file (if an image) has been scanned for faces
-
-    width : PositiveIntegerField
-        The width of the (image or video) file in pixels
-    height : PositiveIntegerField
-        The height of the (image or video) file in pixels
-    orientation : PositiveIntegerField
-        The EXIF orientation of the (image) file
-    duration : DurationField
-        The duration of the (video) file
-    geotag : OneToOneField(GeoTag)
-        The GeoTag instance for the (image or video) file
-    metadata : TextField
-        The file metadata (e.g. EXIF), stored as a JSON object
-    """
-
     history = HistoricalRecords()
 
     FILE_TYPES = (("image", "Image file"), ("video", "Video file"), ("file", "Non-image file"))
@@ -617,26 +316,9 @@ class File(models.Model):
     # File format-type dict
     types = {"image": ["jpg", "jpeg", "png"], "video": ["mp4", "mov"]}
 
+    # Add file to database from local filesystem (detects existing/moved files, but not edited files)
     @staticmethod
     def from_fs(full_name, folder):
-        """ Read a file from the filesystem, and add to database if not yet present
-
-        This method should detect new files and file movements, and ignore unchanged files.
-        It does not (currently) detect other changes to files.
-
-        Parameters
-        ----------
-        full_name : str
-            The full name (including extension) of the file
-        folder : Folder
-            The Folder instance in which the file is found
-
-        Returns
-        -------
-        File
-            The (created or existing) File instance
-        """
-
         utils.log("Found file: %s/%s" % (folder.name, full_name))
 
         # Get file name/path
@@ -761,22 +443,9 @@ class File(models.Model):
 
         return file
 
-    # Get the file type from extension
+    # Get the file type (image/video/other) from extension
     @staticmethod
     def get_type(extension):
-        """ Determine the type of a file from its extension
-
-        Parameters
-        ----------
-        extension : str
-            The filename extension (including preceding dot)
-
-        Returns
-        -------
-        {'file', 'image', 'video'}
-            The file type
-        """
-
         if not extension:
             return "file"
 
@@ -787,21 +456,9 @@ class File(models.Model):
 
         return "file"
 
+    # Read exif data from local filesystem to a dictionary
     @staticmethod
     def get_exif(real_path):
-        """ Read exif data from the file at the given path
-
-        Parameters
-        ----------
-        real_path : str
-            The real local filesystem location of the file
-
-        Returns
-        -------
-        dict
-            All EXIF data for file
-        """
-
         file = open(real_path, "rb")
         exif = exifread.process_file(file)
         file.close()
@@ -822,22 +479,9 @@ class File(models.Model):
 
         return exif_data
 
-    # Generate the file ID
+    # Generate unique file ID from timestamp
     @staticmethod
     def get_id_name(file):
-        """ Generate unique file_id from timestamp
-
-        Parameters
-        ----------
-        file : dict
-            Dictionary of File data, including timestamp
-
-        Returns
-        -------
-        str
-            The generated ID
-        """
-
         dt_id = file["timestamp"].strftime("%Y-%m-%d_%H-%M-%S")
 
         file_qs = File.objects.filter(file_id__startswith=dt_id).order_by("file_id")
@@ -848,21 +492,13 @@ class File(models.Model):
 
         return dt_id + "_" + "%04x" % (max_id + 1)
 
+    # Display name (name, file_id, format)
     def __str__(self):
         return "%s (%s.%s)" % (self.name, self.file_id, self.format)
 
+    # All albums (including parents) to which file belongs (unused)
     @property
     def albums(self):
-        """ All albums to which this file belongs
-
-        Includes all parent albums.
-
-        Returns
-        -------
-        list of Album
-            Full list of albums
-        """
-
         all_albums = set()
         for album_file in AlbumFile.objects.filter(file=self):
             album = album_file.album
@@ -873,69 +509,29 @@ class File(models.Model):
 
         return list(all_albums)
 
+    # Faces found in file (unused)
     @property
     def faces(self):
-        """ Faces found in this file
-
-        Returns
-        -------
-        QuerySet of Face
-            Set of Face instances found
-        """
-
         return Face.objects.filter(file=self)
 
+    # Full (virtual) path to file (including filename)
     @property
     def path(self):
-        """ Full (virtual) path to file
-
-        Includes the file name. Does not include the real filesystem location.
-
-        Returns
-        -------
-        str
-            Path to file
-        """
-
         return self.folder.path + self.name  # self.file_id + "." + self.format
 
+    # Get full local filesystem file path
     def get_real_path(self):
-        """ Get the full (real) path to the file in the local filesystem
-
-        Returns
-        -------
-        str
-            Real path to file
-        """
-
         return self.folder.get_real_path() + self.file_id + "." + self.format
 
+    # Get file timestamp from file_id (None if malformatted)
     def get_id_date(file_id):
-        """ Get the timestamp of a file from its file_id
-
-        Parameters
-        ----------
-        file_id : str
-            The unique ID of the file (from its filename)
-
-        Returns
-        -------
-        datetime or None
-            The timestamp of the file, or None if file_id is malformatted
-        """
-
         try:
             return datetime.datetime.strptime(file_id[:-5], "%Y-%m-%d_%H-%M-%S")
         except ValueError:
             return None
 
+    # Detect faces in (image) file (using OpenCV Haar Cascades, attempting to find eye locations also)
     def detect_faces(self):
-        """ Detect faces in (image) file
-
-        Uses OpenCV Haar Cascades.
-        Also attempts to find eye locations for any faces found.
-        """
-
         # Return if file is not an image, or if it has already been scanned
         if self.type != "image" or self.scanned_faces:
             return
@@ -1011,56 +607,24 @@ class File(models.Model):
         utils.log("Detected %s faces in file: %s" % (len(faces), str(self)))
 
 
+# Category model for people
 class PersonGroup(models.Model):
-    """ Group of Person model
-
-    Attributes
-    ----------
-    name : TextField
-        The name of the group
-
-    """
-
     history = HistoricalRecords()
 
     name = models.TextField()
 
-    def __str__(self):
-        return self.name
 
-
+# Person model to identify faces found in files
 class Person(models.Model):
-    """ Person model
-
-    Attributes
-    ----------
-    full_name : TextField
-        The full name of the person
-    group : ForeignKey(PersonGroup)
-        The group to which the person belongs (default = 0 - Ungrouped)
-    date_created : DateTimeField
-        The date upon which the person was created
-    """
-
     history = HistoricalRecords()
 
     full_name = models.TextField()
     group = models.ForeignKey(PersonGroup, on_delete=models.SET_DEFAULT, default=0, related_name="+")
-    # created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     date_created = models.DateTimeField(auto_now_add=True)
 
+    # Select largest confirmed face to use as thumbnail (None if no confirmed faces)
     @property
     def thumbnail(self):
-        """ A face selected as the thumbnail for this person
-
-        Selects the largest confirmed face.
-
-        Returns
-        -------
-        Face or None
-            The chosen Face, or None if none available
-        """
-
         face_set = Face.objects.filter(person=self, status__lt=2).order_by("-rect_w")
 
         if self.id != 0 and face_set.exists():
@@ -1068,25 +632,17 @@ class Person(models.Model):
         else:
             return None
 
+    # Display name (name and group)
     def __str__(self):
         return "%s (%s)" % (self.full_name, str(self.group))
 
+    # Get all faces (confirmed and unconfirmed)
     def get_faces(self):
-        """ Get faces identified as belonging to person
-
-        Includes both confirmed and unconfirmed identifications.
-
-        Returns
-        -------
-        QuerySet of Face
-            The set of Faces found
-        """
-
         return Face.objects.filter(person=self, status__lt=4)
 
 
+# Update person/status fields on Face model when associated Person object is deleted
 def face_on_person_delete():
-    """ (Face model) Update both `person` and `status` fields when the person is deleted """
     def on_person_delete(collector, field, sub_objs, using):
         collector.add_field_update(field, field.get_default(), sub_objs)
         collector.add_field_update(sub_objs[0]._meta.get_field("status"), 3, sub_objs)
@@ -1096,46 +652,8 @@ def face_on_person_delete():
     return on_person_delete
 
 
+# Face model for faces found in image files
 class Face(models.Model):
-    """ Face model
-
-    Attributes
-    ----------
-    rect_x : PositiveIntegerField
-        X co-ordinate of the centre of the face rectangle
-    rect_y : PositiveIntegerField
-        Y co-ordinate of the centre of the face rectangle
-    rect_w : PositiveIntegerField
-        Width of the face rectangle
-    rect_h : PositiveIntegerField
-        Height of the face rectangle
-    rect_r : FloatField
-        Angle (degrees) of rotation of the face rectangle
-
-    eyes_found : BooleanField
-        Whether or not eyes where successfully identified on the face
-    eye_l_x : PositiveIntegerField
-        X co-ordinate of centre of left eye
-    eye_l_y : PositiveIntegerField
-        Y co-ordinate of centre of left eye
-    eye_r_x : PositiveIntegerField
-        X co-ordinate of centre of right eye
-    eye_r_y : PositiveIntegerField
-        Y co-ordinate of centre of right eye
-
-    file : ForeignKey(File)
-        Image file in which the face is found
-    person : ForeignKey(Person)
-        Person to which the face belongs
-    uncertainty : FloatField
-        Degree of uncertainty in automatic recognition
-    status : PositiveIntegerField
-        Status of face identification
-
-    thumbnail : BinaryField
-        Storage of 160x200 face thumbnail (since extraction is slow)
-    """
-
     history = HistoricalRecords()
 
     STATUS_OPTIONS = ((0, "Confirmed (root)"), (1, "Confirmed (user)"), (2, "Predicted"), (3, "Unassigned"), (4, "Ignored"), (5, "Removed"))
@@ -1159,21 +677,9 @@ class Face(models.Model):
 
     thumbnail = models.BinaryField(null=True)
 
+    # Detect eyes (format [(l_x, l_y), (r_x, r_y)] or None) in face (given as OpenCV pixel matrix)
     @staticmethod
     def get_eyes(face):
-        """ Find eyes within a face
-
-        Parameters
-        ----------
-        face : array
-            The face (as an OpenCV pixel matrix)
-
-        Returns
-        -------
-        list of eye or None
-            The eyes found (in the format [(l_x, l_y), (r_x, r_y)]), or None if no valid pair found
-        """
-
         global cascades
 
         height, width = face.shape[:2]
@@ -1201,27 +707,9 @@ class Face(models.Model):
         else:
             return [left_eye, right_eye]
 
+    # Choose best eye (or None) from list for one side (left = False, right = True) of a face of given dimensions
     @staticmethod
     def choose_eye(all_eyes, side, width, height):
-        """ Choose the best available eye for one side of a face
-
-        Parameters
-        ----------
-        all_eyes : list of eye
-            List of eyes (each in format (x, y))
-        side : bool
-            The side of the face to choose for (left - False, right - True)
-        width : int
-            Width of the whole face
-        height : int
-            Height of the whole face
-
-        Returns
-        -------
-        eye or None
-            The chosen eye, or None if no eye found on the correct side
-        """
-
         for eye in all_eyes:
             eye_side = Face.get_eye_side(eye, width, height)
             if eye_side == side:
@@ -1229,58 +717,26 @@ class Face(models.Model):
 
         return None
 
+    # Determine which side (left = False, right = True) of the face an eye (given as (x, y)) is on
+    # (top-left/bottom-right => left, top-right/bottom-left => right to detect upside down faces)
     @staticmethod
     def get_eye_side(eye, width, height):
-        """ Determine which side of the face an eye is on
-
-        Eyes in top-left/bottom-right quadrants are considered left,
-        and top-right/bottom-left are considered right. This method aims
-        to detect upside-down faces.
-
-        Parameters
-        ----------
-        eye : tuple of int
-            The eye to test (in format (x, y))
-        width : int
-            Width of the whole face
-        height : int
-            Height of the whole face
-
-        Returns
-        -------
-        bool
-            The side of the face (left - False, right - True)
-        """
-
         x = eye[0] - width / 2
         y = height / 2 - eye[1]
 
         return y / x < 0
 
+    # Get angle of rotation (degrees) of face from eye positions (format [(l_x, l_y), (r_x, r_y)])
     @staticmethod
     def get_rotation(eyes):
-        """ Get the angle of rotation of a face from the eye positions
-
-        Parameters
-        ----------
-        eyes : list of eye
-            The eyes (in format [(l_x, l_y), (r_x, r_y)])
-
-        Returns
-        -------
-        float
-            The angle of rotation, in degrees
-        """
-
         x_diff = eyes[0][0] - eyes[1][0]
         y_diff = eyes[0][1] - eyes[1][1]
 
         return math.degrees(math.atan(y_diff / x_diff))
 
+    # Attempt to identify all unconfirmed faces in database, based on user-confirmed faces
     @staticmethod
     def recognize_faces():
-        """ Recognise people in all faces in database, based on user-identified faces """
-
         utils.log("Recognising faces found previously")
 
         # Settings
@@ -1360,25 +816,12 @@ class Face(models.Model):
 
         utils.log(f"Predicted {faces_done} face identities, failed to identify {faces_unknown} faces, skipped {faces_skipped} faces")
 
+    # Display name (person, id, file)
     def __str__(self):
         return f"{self.person.full_name} ({self.id}) in {self.file}"
 
+    # Get image data (as OpenCV pixel matrix) for face (with given OpenCV colour encoding and height options)
     def get_image(self, color, **kwargs):
-        """ Extract this face from its image file
-
-        Parameters
-        ----------
-        color : int
-            OpenCV color encoding constant for Face output
-        height : int, optional
-            Height (pixels) for Face output
-
-        Returns
-        -------
-        array
-            The face, as an OpenCV pixel matrix
-        """
-
         x = self.rect_x
         y = self.rect_y
         w = self.rect_w
@@ -1443,9 +886,8 @@ class Face(models.Model):
 
         return face_image
 
+    # Extract face thumbnail from image file (local filesystem) and save to database
     def save_thumbnail(self):
-        """ Get the image thumbnail for this face, and save it to the database """
-
         face_thumb = self.get_image(cv2.COLOR_BGR2RGB, height=200)
         pil_thumb = Image.fromarray(face_thumb)
         stream = io.BytesIO()
@@ -1454,28 +896,8 @@ class Face(models.Model):
         self.save()
 
 
+# Geotag area model for grouping geotags of multiple files associated with the same location/area
 class GeoTagArea(models.Model):
-    """ GeoTag area grouping model
-
-    Geotags for multiple files associated with the same
-    location/area should be grouped using this model.
-
-    Attributes
-    ----------
-    name : TextField
-        The (user-friendly) name of the location/area
-    address : TextField
-        The address of the location (centre of the area)
-    latitude : FloatField
-        The latitude co-ordinate of the centre of the area
-    longitude : FloatField
-        The longitude co-ordinate of the centre of the area
-    radius : FloatField
-        The radius of the area (TODO determine the unit this is in)
-    date_created : DateTimeField
-        The date upon which this area was created
-    """
-
     history = HistoricalRecords()
 
     name = models.TextField()
@@ -1483,28 +905,11 @@ class GeoTagArea(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     radius = models.FloatField()
-    # created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     date_created = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.name
 
-
+# Geotag model for storing image file locations
 class GeoTag(models.Model):
-    """ GeoTag model for file locations
-
-    Attributes
-    ----------
-    latitude : FloatField
-        The latitude co-ordinate of the location (None if only an area is selected rather a specific point)
-    longitude : FloatField
-        The longitude co-ordinate of the location (None if only an area is selected rather a specific point)
-    area : ForeignKey(GeoTagArea)
-        The area grouping to which this geotag belongs (can be None)
-    date_created : DateTimeField
-        The date upon which this geotag was created
-    """
-
     history = HistoricalRecords()
 
     latitude = models.FloatField(null=True)
@@ -1513,46 +918,22 @@ class GeoTag(models.Model):
     # created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+", null=True)
     date_created = models.DateTimeField(auto_now_add=True)
 
+    # Display name (lat, lng, area)
     def __str__(self):
         return "%s, %s (%s)" % (round(self.latitude, 2) if self.latitude is not None else None, round(self.longitude, 2) if self.longitude is not None else None, self.area)
 
+    # Convert EXIF GPS co-ordinates ([degrees, arcminutes, arcseconds] each in format { num : str, den : str }) to a single value (degrees)
     @staticmethod
     def exif_to_degrees(values):
-        """ Convert EXIF GPS co-ordinate to a single value (in degrees)
-
-        Parameters
-        ----------
-        values : list of { num : str, den : str }
-            EXIF-style co-ordinates, as [degrees, arcminutes, arcseconds].
-            Each is a fraction stored as numerator and denominator.
-
-        Returns
-        -------
-        float
-            The co-ordinate in degrees
-        """
-
         d = float(values[0].num) / float(values[0].den)
         m = float(values[1].num) / float(values[1].den)
         s = float(values[2].num) / float(values[2].den)
 
         return d + (m / 60.0) + (s / 3600.0)
 
+    # Create new GeoTag instance (or None) from location information stored in EXIF data
     @staticmethod
     def from_exif(exif_data):
-        """ Create a GeoTag instance from location information stored in EXIF data
-
-        Parameters
-        ----------
-        exif_data : dict
-            All EXIF data from a file
-
-        Returns
-        -------
-        GeoTag or None
-            A new GeoTag model instance, or None if no location data present
-        """
-
         # Extract variables from dict
         exif_latitude = utils.get_if_exist(exif_data, ["GPS", "GPSLatitude"])
         exif_latitude_ref = utils.get_if_exist(exif_data, ["GPS", "GPSLatitudeRef"])
@@ -1572,3 +953,136 @@ class GeoTag(models.Model):
             return GeoTag.objects.create(latitude=latitude, longitude=longitude)
         else:
             return None
+
+
+# Root Folder for Scan files
+class ScanRootFolder(models.Model):
+    history = HistoricalRecords()
+
+    name = models.TextField()
+    real_path = models.TextField()
+    output_folder = models.ForeignKey(Folder, on_delete=models.PROTECT, related_name="+")
+    folder = models.OneToOneField("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
+
+    # Create attached ScanFolder model when created
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        if created:
+            instance.folder = ScanFolder.objects.create(name=instance.name)
+            instance.save()
+
+    # Get full local filesystem path to folder
+    def get_real_path(self):
+        return self.real_path.rstrip("/") + "/"
+
+    # Update database to reflect local filesystem
+    def update_database(self):
+        try:
+            self.folder.scan_filesystem()
+            self.folder.prune_database()
+            self.folder.generate_output_tree(self.output_folder)
+        except Exception:
+            utils.log(traceback.format_exc())
+
+
+# Attach method to run when ScanRootFolder instances are created
+models.signals.post_save.connect(ScanRootFolder.post_create, sender=ScanRootFolder)
+
+
+# Folder for Scan files
+class ScanFolder(BaseFolder):
+    # Class information for BaseFolder methods
+    root_folder_cls = lambda s: ScanRootFolder
+    folder_cls = lambda s: ScanFolder
+    file_cls = lambda s: Scan
+
+    history = HistoricalRecords()
+
+    name = models.TextField()
+    output_folder = models.ForeignKey(Folder, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
+    parent = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
+
+    # Generate all output folders
+    def generate_output_tree(self, output_folder):
+        self.output_folder = output_folder
+        self.save()
+        for child in ScanFolder.objects.filter(parent=self):
+            output_path = output_folder.get_real_path() + child.name.strip("/") + "/"
+            if not os.path.isdir(output_path):
+                os.mkdir(output_path)
+            new_folder = Folder.from_fs(child.name.strip(), output_folder)
+            child.generate_output_tree(new_folder)
+
+
+# Scan model for scanned photograph image files
+class Scan(models.Model):
+    history = HistoricalRecords()
+
+    name = models.TextField(null=True)
+    format = models.TextField(null=True)
+    folder = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+")
+    done_output = models.BooleanField(default=False)
+
+    width = models.PositiveIntegerField(null=True)
+    height = models.PositiveIntegerField(null=True)
+    orientation = models.PositiveIntegerField(null=True)
+
+    # Get full local filesystem file path
+    def get_real_path(self):
+        return self.folder.get_real_path() + self.name + "." + self.format
+
+    # Get (real) path to save cropped photos
+    def get_output_path(self):
+        return self.folder.output_folder.get_real_path() + self.name
+
+    # Get locations of photos given crop lines
+    def get_image_rects(self, lines, options):
+        return scancrop.get_image_rects(self.get_real_path(), lines, self.width, self.height, options)
+
+    # Save cropped images given crop lines
+    def confirm_crop(self, lines, options):
+        output_fns = scancrop.save_images(self.get_real_path(), lines, self.width, self.height, options, self.get_output_path())
+        for fn in output_fns:
+            File.from_fs(fn, self.folder.output_folder)
+        self.done_output = True
+        self.save()
+
+    # Add Scan file to database from local filesystem (detects existing if unmoved)
+    @staticmethod
+    def from_fs(full_name, folder):
+        utils.log("Found scan file: %s/%s" % (folder.name, full_name))
+
+        # Get file name/path
+        name, extension = os.path.splitext(full_name)
+        extension = extension[1:]
+        real_path = folder.get_real_path() + full_name
+
+        if extension.lower() not in ["jpg", "jpeg", "png"]:
+            return None
+
+        # Search for scan already in database
+        scan_qs = Scan.objects.filter(name=name, folder=folder)
+        if scan_qs.exists():
+            return scan_qs.first()
+
+        # Get image dimensions and orientation
+        exif_data = File.get_exif(real_path)
+        exif_width = utils.get_if_exist(exif_data, ["EXIF", "ExifImageWidth"])
+        exif_height = utils.get_if_exist(exif_data, ["EXIF", "ExifImageLength"])
+        if exif_width and exif_height:
+            width = exif_width
+            height = exif_height
+        else:
+            image = Image.open(real_path)
+            width = image.size[0]
+            height = image.size[1]
+            image.close()
+        orientation = utils.get_if_exist(exif_data, ["Image", "Orientation"])
+
+        utils.log("Adding scan to database: %s/%s" % (folder.name, full_name))
+
+        # Create new scan object
+        scan = Scan.objects.create(name=name, format=extension, folder=folder, width=width, height=height, orientation=orientation)
+        scan.save()
+
+        return scan

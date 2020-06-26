@@ -10,42 +10,16 @@ admin.site.register(models.AuthGroup)
 admin.site.register(models.UserConfig)
 
 
-def get_files(modeladmin, request, queryset):
-    """ Detect new/moved files in the local filesystem """
-
-    threads = []
-    for folder in queryset:
-        threads.append(threading.Thread(target=folder.scan_filesystem))
-    for thread in threads:
-        thread.start()
+def update_files(modeladmin, request, queryset):
+    threading.Thread(target=lambda: [folder.scan_filesystem() for folder in queryset]).start()
     modeladmin.message_user(request, format_html("Began scanning %s root folders. See <a href='/admin/logs'>here</a> for details." % len(queryset)))
 
 
-get_files.short_description = "Scan the filesystem for new files"
-
-
-def clear_files(modeladmin, request, queryset):
-    """ Detect file deletions in the local filesystem """
-
-    threads = []
-    for folder in queryset:
-        threads.append(threading.Thread(target=folder.prune_database))
-    for thread in threads:
-        thread.start()
-    modeladmin.message_user(request, format_html("Began pruning %s root folders. See <a href='/admin/logs'>here</a> for details." % len(queryset)))
-
-
-clear_files.short_description = "Prune deleted files from the database"
+update_files.short_description = "Scan for new files/clear deleted files"
 
 
 def get_faces(modeladmin, request, queryset):
-    """ Detect faces in image files """
-
-    threads = []
-    for folder in queryset:
-        threads.append(threading.Thread(target=folder.detect_faces))
-    for thread in threads:
-        thread.start()
+    threading.Thread(target=lambda: [folder.detect_faces() for folder in queryset]).start()
     modeladmin.message_user(request, format_html("Began scanning files in %s root folders for faces. See <a href='/admin/logs'>here</a> for details." % len(queryset)))
 
 
@@ -53,10 +27,7 @@ get_faces.short_description = "Detect faces in files"
 
 
 def recognize_faces(modeladmin, request, queryset):
-    """ Recognize faces as people """
-
-    thread = threading.Thread(target=models.Face.recognize_faces)
-    thread.start()
+    threading.Thread(target=models.Face.recognize_faces).start()
     modeladmin.message_user(request, format_html("Began predicting identities of all faces in database. See <a href='/admin/logs'>here</a> for details."))
 
 
@@ -64,26 +35,27 @@ recognize_faces.short_description = "Recognize (all) faces in database"
 
 
 def update_database(modeladmin, request, queryset):
-    """ Run all fileserver database updates """
-
-    threads = []
-    for folder in queryset:
-        threads.append(threading.Thread(target=folder.update_database))
-    for thread in threads:
-        thread.start()
+    threading.Thread(target=lambda: [folder.update_database() for folder in queryset]).start()
     modeladmin.message_user(request, format_html("Began updating the database for %s root folders. See <a href='/admin/logs'>here</a> for details." % len(queryset)))
 
-
-# TODO remove threads, different folders should be handled sequentially
-# and ideally avoid repeating face-recognition when multiple folders selected
 
 update_database.short_description = "Update all aspects of the database"
 
 
 class RootFolderAdmin(SimpleHistoryAdmin):
-    """ Admin actions for fileserver database management, attached to RootFolder """
+    actions = [update_files, get_faces, recognize_faces, update_database]
 
-    actions = [get_files, clear_files, get_faces, recognize_faces, update_database]
+
+def update_scans(modeladmin, request, queryset):
+    threading.Thread(target=lambda: [folder.update_database() for folder in queryset]).start()
+    modeladmin.message_user(request, format_html("Began searching %s root folders for scan files. See <a href='/admin/logs'>here</a> for details." % len(queryset)))
+
+
+update_scans.short_description = "Update scan files listed in database"
+
+
+class ScanRootFolderAdmin(SimpleHistoryAdmin):
+    actions = [update_scans]
 
 
 admin.site.register(models.RootFolder, RootFolderAdmin)
@@ -105,3 +77,9 @@ admin.site.register(models.Face, SimpleHistoryAdmin)
 admin.site.register(models.GeoTagArea, SimpleHistoryAdmin)
 
 admin.site.register(models.GeoTag, SimpleHistoryAdmin)
+
+admin.site.register(models.ScanRootFolder, ScanRootFolderAdmin)
+
+admin.site.register(models.ScanFolder, SimpleHistoryAdmin)
+
+admin.site.register(models.Scan, SimpleHistoryAdmin)
