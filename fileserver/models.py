@@ -164,6 +164,7 @@ class Folder(BaseFolder):
         # Load cascades if needed
         global cascades
         if cascades is None:
+            cascades = {}
             cascades["face"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt.xml")
             cascades["eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
             cascades["left_eye"] = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_lefteye_2splits.xml")
