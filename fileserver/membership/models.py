@@ -8,6 +8,9 @@ class AuthGroup(models.Model):
     group = models.OneToOneField(Group, related_name="auth", on_delete=models.CASCADE)
     token = models.TextField(max_length=64, default=secrets.token_hex)
 
+    def __str__(self):
+        return str(self.group.name)
+
     @staticmethod
     def user_is_auth(user):
         if AuthGroup.user_is_admin(user):
