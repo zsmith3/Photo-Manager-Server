@@ -212,7 +212,6 @@ class RootFolder(models.Model):
     def update_database(self):
         try:
             self.scan_filesystem()
-            self.prune_database()
             self.detect_faces()
             Face.recognize_faces()
         except Exception:
