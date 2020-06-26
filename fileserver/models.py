@@ -766,6 +766,10 @@ class Face(models.Model):
                     faces_done += 1
         utils.log(f"Encoded {faces_done} faces, skipped {faces_skipped} faces")
 
+        if faces_done == 0:
+            utils.log("No faces identified, skipping recognition.")
+            return
+
         # Determine how many neighbors to use for weighting in the KNN classifier
         if n_neighbors is None:
             n_neighbors = int(round(math.sqrt(len(X))))
