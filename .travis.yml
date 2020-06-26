@@ -4,4 +4,4 @@ python:
   - "3.6"
   - "3.7"
 script:
-  - yapf --diff --recursive --style='{column_limit:180}' .
+  - yapf --diff --recursive --style='{column_limit:180}' --exclude='**/migrations/**' .

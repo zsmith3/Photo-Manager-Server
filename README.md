@@ -40,7 +40,7 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 
 This codebase uses YAPF for formatting - use the following command to auto-format all files:
 
-`yapf --in-place --recursive --style='{column_limit: 180}' .`
+`yapf --in-place --recursive --style='{column_limit: 180}' --exclude='**/migrations/**' .`
 
 
 ## Contributing
