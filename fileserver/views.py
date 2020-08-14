@@ -1,5 +1,7 @@
 # Standard imports
 import datetime
+import io
+import json
 import os
 
 # Django imports
@@ -82,7 +84,7 @@ def log_view(request, *args, **kwargs):
 # Provide an image from File or Scan model ID, with width/height/quality options
 def image_view(request, *args, **kwargs):
     # EXIF orientations constant
-    rotations = {3: 180, 6: 270, 8: 90}
+    rotations = {1: 0, 3: 180, 6: 270, 8: 90}
 
     # Ensure request is authorised
     if not permissions.FileserverPermission().has_permission(request):
@@ -116,16 +118,24 @@ def image_view(request, *args, **kwargs):
                     image.thumbnail((kwargs["width"], kwargs["height"]))
 
                 # Rotate if needed
-                if file.orientation in rotations:
+                if file.orientation in rotations and file.orientation != 1:
                     image = image.rotate(rotations[file.orientation], expand=True)
 
                 # Create response from image
                 response = http.HttpResponse(content_type="image/jpeg")
                 image.save(response, "JPEG", quality=quality)
             else:
-                # Create response from unaltered image data
-                data = open(file.get_real_path(), "rb").read()
-                response = http.HttpResponse(data, content_type="image/jpeg")
+                exif_orientation = json.loads(file.metadata)["exif"]["Image"]["Orientation"]
+                if exif_orientation == file.orientation or exif_orientation not in rotations or file.orientation not in rotations:
+                    # Create response from unaltered image data
+                    data = open(file.get_real_path(), "rb").read()
+                    response = http.HttpResponse(data, content_type="image/jpeg")
+                else:
+                    # Load and rotate image
+                    image = Image.open(file.get_real_path())
+                    image = image.rotate(rotations[file.orientation] - rotations[exif_orientation], expand=True)
+                    response = http.HttpResponse(content_type="image/jpeg")
+                    image.save(response, "JPEG", quality=95)
 
             response["Content-Disposition"] = "filename=\"%s.%s\"" % (file.name, file.format)
             return response
@@ -137,6 +147,9 @@ def image_view(request, *args, **kwargs):
 
 # Provide EXIF thumbnail of image File or Scan if available
 def image_thumb_view(request, *args, **kwargs):
+    # EXIF orientations constant
+    rotations = {3: 180, 6: 270, 8: 90}
+
     # Ensure request is authorised
     if not permissions.FileserverPermission().has_permission(request):
         return http.HttpResponseForbidden()
@@ -154,6 +167,14 @@ def image_thumb_view(request, *args, **kwargs):
             # Load exif thumbnail
             exif = piexif.load(file.get_real_path())
             data = exif["thumbnail"]
+
+            # Rotate if needed
+            if file.orientation in rotations:
+                image = Image.open(io.BytesIO(data))
+                image = image.rotate(rotations[file.orientation], expand=True)
+                data_io = io.BytesIO()
+                image.save(data_io, "JPEG")
+                data = data_io.getvalue()
 
             # Reject if no thumbnail in EXIF data
             if data is None:

@@ -37,7 +37,7 @@ class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.File
         fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "timestamp", "width", "height", "orientation", "duration", "geotag")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "geotag"]}
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "geotag", "orientation"]}
 
 
 # Folder serializer
