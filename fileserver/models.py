@@ -307,7 +307,7 @@ class File(models.Model):
 
     width = models.PositiveIntegerField(null=True)
     height = models.PositiveIntegerField(null=True)
-    orientation = models.PositiveIntegerField(null=True)
+    orientation = models.PositiveIntegerField(default=1)
     duration = models.DurationField(null=True)
     geotag = models.OneToOneField("GeoTag", on_delete=models.SET_NULL, null=True, blank=True)
     metadata = models.TextField(default="{}")

@@ -125,7 +125,7 @@ def image_view(request, *args, **kwargs):
                 response = http.HttpResponse(content_type="image/jpeg")
                 image.save(response, "JPEG", quality=quality)
             else:
-                exif_orientation = json.loads(file.metadata)["exif"]["Image"]["Orientation"]
+                exif_orientation = utils.get_if_exist(json.loads(file.metadata), ["exif", "Image", "Orientation"]) or 1
                 if exif_orientation == file.orientation or exif_orientation not in rotations or file.orientation not in rotations:
                     # Create response from unaltered image data
                     data = open(file.get_real_path(), "rb").read()
@@ -168,6 +168,10 @@ def image_thumb_view(request, *args, **kwargs):
             exif = piexif.load(file.get_real_path())
             data = exif["thumbnail"]
 
+            # Reject if no thumbnail in EXIF data
+            if data is None:
+                return http.HttpResponseNotFound()
+
             # Rotate if needed
             if file.orientation in rotations:
                 image = Image.open(io.BytesIO(data))
@@ -175,10 +179,6 @@ def image_thumb_view(request, *args, **kwargs):
                 data_io = io.BytesIO()
                 image.save(data_io, "JPEG")
                 data = data_io.getvalue()
-
-            # Reject if no thumbnail in EXIF data
-            if data is None:
-                return http.HttpResponseNotFound()
 
             # Return the thumbnail response
             response = http.HttpResponse(data, content_type="image/jpeg")
