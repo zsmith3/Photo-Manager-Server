@@ -406,7 +406,7 @@ class File(models.Model):
             image.close()
 
         # Extract EXIF orientation
-        new_file["orientation"] = utils.get_if_exist(exif_data, ["Image", "Orientation"])
+        new_file["orientation"] = utils.get_if_exist(exif_data, ["Image", "Orientation"]) or 1
 
         exif_geotag = GeoTag.from_exif(exif_data)
         if exif_geotag:
