@@ -125,7 +125,7 @@ def image_view(request, *args, **kwargs):
                 response = http.HttpResponse(content_type="image/jpeg")
                 image.save(response, "JPEG", quality=quality)
             else:
-                exif_orientation = utils.get_if_exist(json.loads(file.metadata), ["exif", "Image", "Orientation"]) or 1
+                exif_orientation = (utils.get_if_exist(json.loads(file.metadata), ["exif", "Image", "Orientation"]) or 1) if not is_scan else 1
                 if exif_orientation == file.orientation or exif_orientation not in rotations or file.orientation not in rotations:
                     # Create response from unaltered image data
                     data = open(file.get_real_path(), "rb").read()
