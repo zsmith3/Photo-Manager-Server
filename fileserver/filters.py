@@ -21,7 +21,7 @@ class BaseFileFilter(filters.FilterSet):
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         if "folder" in data and "isf" in data and data["isf"] in ["true", "1"]:
             folder_id = data["folder"]
-            folder_qs = self.folder_cls().objects.filter(id=folder_id)
+            folder_qs = self.Meta.folder_cls.objects.filter(id=folder_id)
             if folder_qs.exists():
                 folder = folder_qs.first()
                 all_folders = [folder] + list(folder.get_children(True))
@@ -42,6 +42,7 @@ class FileFilter(BaseFileFilter):
 
     class Meta:
         model = models.File
+        folder_cls = models.Folder
         fields = {"folder": ["exact", "in"]}
 
 
@@ -50,7 +51,7 @@ class BaseFolderFilter(filters.FilterSet):
     def __init__(self, data=None, queryset=None, *, relationship=None, **kwargs):
         if "parent" in data and "isf" in data and data["isf"] in ["true", "1"]:
             parent_id = data["parent"]
-            parent_qs = self.folder_cls().objects.filter(id=parent_id)
+            parent_qs = self.Meta.model.objects.filter(id=parent_id)
             if parent_qs.exists():
                 parent = parent_qs.first()
                 all_folders = list(parent.get_children(True))
@@ -131,6 +132,7 @@ class ScanFilter(BaseFileFilter):
 
     class Meta:
         model = models.Scan
+        folder_cls = models.Folder
         fields = {"folder": ["exact", "in"], "done_output": ["exact"]}
 
 
