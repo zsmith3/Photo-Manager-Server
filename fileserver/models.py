@@ -46,13 +46,6 @@ class BaseFolder(models.Model):
     class Meta:
         abstract = True
 
-    # Total file count (includes subfolders)
-    @property
-    def file_count(self):
-        subfolder_count = sum([folder.file_count for folder in self.folder_cls().objects.filter(parent=self)])
-        file_count = self.file_cls().objects.filter(folder=self).count()
-        return subfolder_count + file_count
-
     # List filenames from local filesystem
     def get_fs_filenames(self):
         return os.listdir(self.get_real_path())
@@ -88,6 +81,34 @@ class BaseFolder(models.Model):
         if not os.path.isdir(self.get_real_path()):
             self.delete()
 
+    # Recursively update cached properties (when database updated)
+    def update_props(self):
+        # Update path
+        if self.parent is None:
+            self.path = self.name.rstrip("/") + "/"
+        else:
+            self.path = self.parent.path + self.name.strip("/") + "/"
+        self.save()
+
+        # Recursively update subfolders
+        subfolders = self.folder_cls().objects.filter(parent=self)
+        for folder in subfolders:
+            folder.update_props()
+        files = self.file_cls().objects.filter(folder=self)
+
+        # Update file count
+        subfolder_count = sum([folder.file_count for folder in subfolders])
+        file_count = files.count()
+        self.file_count = subfolder_count + file_count
+
+        # Update length
+        if self.has_length:
+            subfolder_length = sum(folder.length for folder in subfolders)
+            file_length = files.aggregate(models.Sum("length"))["length__sum"] or 0
+            self.length = subfolder_length + file_length
+
+        self.save()
+
     # Add folder to database from filesystem
     @classmethod
     def from_fs(cls, name, parent):
@@ -102,14 +123,6 @@ class BaseFolder(models.Model):
         folder.scan_filesystem()
 
         return folder
-
-    # Virtual path to folder (found recursively)
-    @property
-    def path(self):
-        if self.parent is None:
-            return self.name.rstrip("/") + "/"
-        else:
-            return self.parent.path + self.name.strip("/") + "/"
 
     # Full local filesystem path to folder
     def get_real_path(self):
@@ -144,18 +157,15 @@ class Folder(BaseFolder):
     root_folder_cls = lambda s: RootFolder
     folder_cls = lambda s: Folder
     file_cls = lambda s: File
+    has_length = True
 
     history = HistoricalRecords()
 
     name = models.TextField()
     parent = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
-
-    # Size in bytes (includes all files in subfolders)
-    @property
-    def length(self):
-        subfolder_length = sum(folder.length for folder in Folder.objects.filter(parent=self))
-        file_length = File.objects.filter(folder=self).aggregate(models.Sum("length"))["length__sum"] or 0
-        return subfolder_length + file_length
+    file_count = models.PositiveIntegerField(default=0)
+    length = models.PositiveIntegerField(default=0)
+    path = models.TextField(default="")
 
     # Detect faces in files in folder
     def detect_faces(self):
@@ -204,6 +214,7 @@ class RootFolder(models.Model):
     def scan_filesystem(self):
         self.folder.scan_filesystem()
         self.folder.prune_database()
+        self.folder.update_props()
 
     # Detect faces in contained files
     def detect_faces(self):
@@ -524,6 +535,7 @@ class File(models.Model):
         return self.folder.get_real_path() + self.file_id + "." + self.format
 
     # Get file timestamp from file_id (None if malformatted)
+    @staticmethod
     def get_id_date(file_id):
         try:
             return datetime.datetime.strptime(file_id[:-5], "%Y-%m-%d_%H-%M-%S")
@@ -984,6 +996,7 @@ class ScanRootFolder(models.Model):
         try:
             self.folder.scan_filesystem()
             self.folder.prune_database()
+            self.folder.update_props()
             self.folder.generate_output_tree(self.output_folder)
         except Exception:
             utils.log(traceback.format_exc())
@@ -999,12 +1012,15 @@ class ScanFolder(BaseFolder):
     root_folder_cls = lambda s: ScanRootFolder
     folder_cls = lambda s: ScanFolder
     file_cls = lambda s: Scan
+    has_length = False
 
     history = HistoricalRecords()
 
     name = models.TextField()
     output_folder = models.ForeignKey(Folder, on_delete=models.PROTECT, related_name="+", null=True, blank=True)
     parent = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
+    file_count = models.PositiveIntegerField(default=0)
+    path = models.TextField(default="")
 
     # Generate all output folders
     def generate_output_tree(self, output_folder):

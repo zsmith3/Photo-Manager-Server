@@ -7,7 +7,7 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 
 ## Installation
 
-1) Install [Python](https://www.python.org/downloads/)
+1) Install [Python](https://www.python.org/downloads/) and [CMake](https://cmake.org/download/).
 2) Clone this repository (`git clone https://github.com/zsmith3/Photo-Manager-Server/`) and enter it (`cd Photo-Manager-Server`)
 3) Install dependencies and collect static files:
 	- `pip install -r requirements.txt`
