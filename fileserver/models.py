@@ -164,7 +164,7 @@ class Folder(BaseFolder):
     name = models.TextField()
     parent = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
     file_count = models.PositiveIntegerField(default=0)
-    length = models.PositiveIntegerField(default=0)
+    length = models.PositiveBigIntegerField(default=0)
     path = models.TextField(default="")
 
     # Detect faces in files in folder
@@ -310,7 +310,7 @@ class File(models.Model):
     folder = models.ForeignKey("Folder", on_delete=models.CASCADE, related_name="+")
     type = models.TextField(choices=FILE_TYPES, default="file")
     format = models.TextField(null=True)
-    length = models.BigIntegerField()
+    length = models.PositiveBigIntegerField()
     is_starred = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     timestamp = models.DateTimeField(null=True)
