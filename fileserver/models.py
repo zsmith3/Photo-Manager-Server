@@ -313,6 +313,7 @@ class File(models.Model):
     length = models.PositiveBigIntegerField()
     is_starred = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    notes = models.TextField(null=True)
     timestamp = models.DateTimeField(null=True)
     scanned_faces = models.BooleanField(default=False)
 
