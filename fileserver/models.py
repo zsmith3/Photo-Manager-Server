@@ -612,6 +612,7 @@ class File(models.Model):
 
             face = Face.objects.create(**face_dict)
             face.save_thumbnail()
+            face.save_encoding()
 
         # Register that file has now been scanned
         self.scanned_faces = True
@@ -689,6 +690,7 @@ class Face(models.Model):
     status = models.PositiveIntegerField(choices=STATUS_OPTIONS)
 
     thumbnail = models.BinaryField(null=True)
+    encoding = models.BinaryField(null=True)
 
     # Detect eyes (format [(l_x, l_y), (r_x, r_y)] or None) in face (given as OpenCV pixel matrix)
     @staticmethod
@@ -758,26 +760,22 @@ class Face(models.Model):
         distance_threshold = 0.5
 
         # Add each known face
-        utils.log("Encoding known faces")
+        utils.log("Fetching known face encodings")
         faces_done = 0
         faces_skipped = 0
         X = []
         y = []
         for person in Person.objects.all():
             faces = Face.objects.filter(person__id=person.id, status__lt=2)
-            utils.log(f"Encoding {faces.count()} faces for {person.full_name}")
             for face in faces:
-                image = face.get_image(cv2.COLOR_BGR2RGB)
-                face_bounding_boxes = face_recognition.face_locations(image)
-                if len(face_bounding_boxes) != 1:
-                    # Skip face if face_locations cannot properly detect it
+                enc = face.load_encoding()
+                if enc is None:
                     faces_skipped += 1
                 else:
-                    # Add face encoding for current image to the training set
-                    X.append(face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes)[0])
+                    X.append(enc)
                     y.append(person.id)
                     faces_done += 1
-        utils.log(f"Encoded {faces_done} faces, skipped {faces_skipped} faces")
+        utils.log(f"Found encodings for {faces_done} faces, skipped {faces_skipped} faces")
 
         if faces_done == 0:
             utils.log("No faces identified, skipping recognition.")
@@ -805,22 +803,19 @@ class Face(models.Model):
         faces_done = 0
         faces_unknown = 0
         for face in unknown_faces:
-            X_img = face.get_image(cv2.COLOR_BGR2RGB)
-            X_face_locations = face_recognition.face_locations(X_img)
+            face_enc = face.load_encoding()
 
-            # Skip face if face_locations cannot properly detect it
-            if len(X_face_locations) != 1:
+            # Skip face if no encoding found
+            if face_enc is None:
                 faces_skipped += 1
                 face.person = Person.objects.filter(id=0).first()
                 face.status = 3
                 face.save()
             else:
-                faces_encodings = face_recognition.face_encodings(X_img, known_face_locations=X_face_locations)
-
-                closest_distances = knn_clf.kneighbors(faces_encodings, n_neighbors=1)
+                closest_distances = knn_clf.kneighbors([face_enc], n_neighbors=1)
                 is_match = closest_distances[0][0][0] <= distance_threshold
 
-                result = knn_clf.predict(faces_encodings)[0] if is_match else 0
+                result = knn_clf.predict([face_enc])[0] if is_match else 0
                 utils.log("Predicted %s with confidence %s" % (Person.objects.filter(id=result).first().full_name, closest_distances[0][0][0]))
                 if result != 0:
                     faces_done += 1
@@ -911,6 +906,25 @@ class Face(models.Model):
         pil_thumb.save(stream, "JPEG", quality=75)
         self.thumbnail = stream.getvalue()
         self.save()
+
+    # Attempt to generate face encoding and save to database
+    def save_encoding(self):
+        image = self.get_image(cv2.COLOR_BGR2RGB)
+        face_bounding_boxes = face_recognition.face_locations(image)
+        if len(face_bounding_boxes) != 1:
+            return False
+        else:
+            encoding = face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes, model="large")[0]
+            self.encoding = encoding.tobytes()
+            self.save()
+            return True
+
+    # Load saved face encoding
+    def load_encoding(self):
+        if self.encoding is None:
+            return None
+        else:
+            return numpy.frombuffer(self.encoding, dtype=numpy.dtype("float64"))
 
 
 # Geotag area model for grouping geotags of multiple files associated with the same location/area
