@@ -221,7 +221,7 @@ class FileViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FileSerializer
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
-    queryset = models.File.objects.all()
+    queryset = models.File.objects.all().order_by("folder", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
     pagination_class = filters.CustomPagination
 
@@ -231,7 +231,7 @@ class FolderViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.FolderSerializer
     filter_class = filters.FolderFilter
-    queryset = models.Folder.objects.all()
+    queryset = models.Folder.objects.all().order_by("parent", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
 
 
