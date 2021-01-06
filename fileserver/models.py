@@ -355,7 +355,11 @@ class File(models.Model):
 
         # Get EXIF and mutagen data from file
         exif_data = File.get_exif(real_path)
-        mutagen_data = mutagen.File(real_path, easy=True) or {}
+        try:
+            mutagen_data = mutagen.File(real_path, easy=True) or {}
+        except Exception as e:
+            utils.log("Mutagen error: %s" % str(e))
+            mutagen_data = {}
 
         # Get file title from exif or name
         exif_title = utils.get_if_exist(exif_data, ["Image", "ImageDescription"])
@@ -448,10 +452,13 @@ class File(models.Model):
                 exif_dict["0th"][piexif.ImageIFD.ImageDescription] = new_file["name"]
                 piexif.insert(piexif.dump(exif_dict), new_real_path)
             except Exception:
-                mutagen_file = mutagen.File(new_real_path, easy=True)
-                if mutagen_file is not None:
-                    mutagen_file["title"] = new_file["name"]
-                    mutagen_file.save()
+                try:
+                    mutagen_file = mutagen.File(new_real_path, easy=True)
+                    if mutagen_file is not None:
+                        mutagen_file["title"] = new_file["name"]
+                        mutagen_file.save()
+                except Exception:
+                    pass
 
         return file
 
