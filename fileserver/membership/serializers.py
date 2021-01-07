@@ -60,62 +60,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return validated_data
 
 
-""" # Login API serializer
-class UserLoginSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(required=False, allow_blank=True)
-    email = serializers.EmailField(label="Email Address", required=False, allow_blank=True)
-
-    full_name = serializers.CharField(read_only=True)
-
-    class Meta:
-        model = User
-        fields = ("username", "email", "password", "full_name")
-        extra_kwargs = {"password": {"write_only": True}}
-
-    def validate(self, data):
-        user_obj = None
-        email = data.get("email")
-        username = data.get("username")
-        password = data.get("password")
-
-        if not (email or username):
-            raise serializers.ValidationError("A username or email is required to login.")
-
-        user = User.objects.filter(
-            Q(email=email) | Q(username=username)
-        ).distinct().exclude(email__isnull=True).exclude(email__iexact="")
-
-        if user.exists() and user.count():
-            user_obj = user.first()
-        else:
-            raise serializers.ValidationError("The username/email address is not valid.")
-
-        if user_obj:
-            if user_obj.check_password(password):
-                data["username"] = user_obj.get_username()
-                data["email"] = user_obj.email
-                data["full_name"] = user_obj.get_full_name()
-            else:
-                raise serializers.ValidationError("Incorrect credentials.")
-
-        return data """
-
-
 # Serializer for User Config
 class UserConfigSerializer(serializers.ModelSerializer):
     default_settings = serializers.DictField(default=models.UserConfig.SETTINGS)
-    platform = serializers.SerializerMethodField()
-
-    def get_platform(self, obj):
-        ua_string = self.context["request"].META["HTTP_USER_AGENT"]
-        user_agent = user_agents.parse(ua_string)
-        platform = "mobile" if user_agent.is_mobile else "desktop"
-        return platform
 
     class Meta:
         model = models.UserConfig
-        fields = (
-            "default_settings",
-            "platform",
-        ) + tuple(platform + setting for setting in models.UserConfig.SETTINGS for platform in ["desktop_", "mobile_"])
+        fields = ("default_settings", ) + tuple(platform + setting for setting in models.UserConfig.SETTINGS for platform in ["desktop_", "mobile_"])
         extra_kwargs = {field: {"read_only": True} for field in ["default_settings", "platform"]}
