@@ -15,42 +15,6 @@ class UserCreateAPIView(generics.CreateAPIView):
     queryset = User.objects.all()
 
 
-""" # User login API
-class UserLoginAPIView(views.APIView):
-    serializer_class = serializers.UserLoginSerializer
-
-    def post(self, request, *args, **kwargs):
-        data = request.data
-        serializer = serializers.UserLoginSerializer(data=data)
-
-        if serializer.is_valid(raise_exception=True):
-            new_data = serializer.data
-
-            user = authenticate(request, username=new_data["username"], password=data["password"])
-            if user is not None:
-                login(request, user)
-
-            if "remain_in" not in request.data or not request.data["remain_in"]:
-                request.session.set_expiry(0)
-
-            return response.Response(new_data, status=status.HTTP_200_OK)
-        else:
-            return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) """
-
-
-# User Config API
-class UserConfigView(generics.RetrieveUpdateAPIView):
-    permission_classes = (permissions.FileserverPermission, )
-    serializer_class = serializers.UserConfigSerializer
-    queryset = models.UserConfig.objects.all()
-    http_method_names = [method for method in generics.RetrieveUpdateAPIView.http_method_names if method not in ["put"]]
-
-    def get_object(self):
-        queryset = self.get_queryset()
-        obj = get_object_or_404(queryset, user=self.request.user)
-        return obj
-
-
 # User Status API
 class UserStatusView(views.APIView):
     def get(self, request):
@@ -62,11 +26,20 @@ class UserStatusView(views.APIView):
         data = {"authenticated": fs_auth}
         if fs_auth:
             data["user"] = {"username": request.user.username, "full_name": request.user.first_name + " " + request.user.last_name}
+            data["config"] = serializers.UserConfigSerializer(models.UserConfig.objects.filter(user=request.user.id).first()).data
         return response.Response(data, status=status.HTTP_200_OK)
 
+    def patch(self, request, *args, **kwargs):
+        if not (request.user.is_authenticated and models.AuthGroup.user_is_auth(request.user)):
+            return response.Response({"detail": "Not authenticated."}, status=status.HTTP_403_FORBIDDEN)
 
-""" # User Logout API
-class UserLogoutView(views.APIView):
-    def get(self, request):
-        logout(request)
-        return UserStatusView.get(self, request) """
+        if "config" not in request.data:
+            return response.Response({"detail": "Config data not provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        partial = kwargs.pop('partial', False)
+        instance = models.UserConfig.objects.filter(user=request.user.id).first()
+        serializer = serializers.UserConfigSerializer(instance, data=request.data["config"], partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return self.get(request)
