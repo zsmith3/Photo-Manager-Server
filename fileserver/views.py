@@ -263,7 +263,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     permission_classes = (permissions.FileserverPermission, )
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
-    queryset = models.Face.objects.all().order_by("-status", "uncertainty")
+    queryset = models.Face.objects.all().order_by("-status", "uncertainty", "id")
     filter_class = filters.FaceFilter
     pagination_class = filters.CustomPagination
 
