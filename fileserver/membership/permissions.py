@@ -5,22 +5,28 @@ from rest_framework_jwt.authentication import JSONWebTokenAuthentication
 from . import models
 
 
+# Get user from request object
+def get_request_user(request):
+    try:
+        auth = JSONWebTokenAuthentication().authenticate(request)
+    except exceptions.AuthenticationFailed:
+        return None
+
+    if auth is None:
+        return None
+    else:
+        return auth[0]
+
+
 # Permission class for fileserver API access
 class FileserverPermission(permissions.BasePermission):
     def has_permission(self, request, view=None):
-        # No auth required in debug mode
-        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
-            return True
-
-        try:
-            auth = JSONWebTokenAuthentication().authenticate(request)
-        except exceptions.AuthenticationFailed:
-            return False
-
-        if auth is None:
-            return False
-        else:
-            user = auth[0]
+        user = get_request_user(request)
+        if user is None:
+            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
+                return True
+            else:
+                return False
 
         if models.AuthGroup.user_is_admin(user):
             return True

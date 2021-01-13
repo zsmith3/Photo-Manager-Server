@@ -68,3 +68,15 @@ class UserConfigSerializer(serializers.ModelSerializer):
         model = models.UserConfig
         fields = ("default_settings", ) + tuple(platform + setting for setting in models.UserConfig.SETTINGS for platform in ["desktop_", "mobile_"])
         extra_kwargs = {field: {"read_only": True} for field in ["default_settings", "platform"]}
+
+
+# Serializer for Auth Group
+class AuthGroupSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, obj):
+        return obj.group.name
+
+    class Meta:
+        model = models.AuthGroup
+        fields = ["id", "name"]

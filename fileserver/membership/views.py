@@ -27,6 +27,7 @@ class UserStatusView(views.APIView):
         if fs_auth:
             data["user"] = {"username": request.user.username, "full_name": request.user.first_name + " " + request.user.last_name}
             data["config"] = serializers.UserConfigSerializer(models.UserConfig.objects.filter(user=request.user.id).first()).data
+            data["auth_groups"] = serializers.AuthGroupSerializer(models.AuthGroup.objects.filter(group__in=request.user.groups.all()), many=True).data
         return response.Response(data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):

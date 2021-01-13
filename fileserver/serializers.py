@@ -1,5 +1,8 @@
+from django.conf import settings
 from rest_framework import serializers
 from . import models
+from .membership import permissions
+from .membership.models import AuthGroup
 
 
 # GeoTag serializer
@@ -15,6 +18,13 @@ class FileSerializer(serializers.ModelSerializer):
 
     # Create new Geotag instance when given in nested update data
     def update(self, instance, validated_data):
+        if "access_group" in validated_data:
+            user = permissions.get_request_user(self.context["request"])
+            if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
+                access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
+                if validated_data["access_group"] not in access_groups:
+                    raise serializers.ValidationError({"access_group": "Must be a group to which you belong."})
+
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
             if geotag_data is None:
@@ -36,16 +46,27 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.File
-        fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "notes", "timestamp", "width", "height", "orientation", "duration", "geotag")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation"]}
+        fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "notes", "timestamp", "width", "height", "orientation", "duration", "geotag",
+                  "access_group")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation", "access_group"]}
 
 
 # Folder serializer
 class FolderSerializer(serializers.ModelSerializer):
+    def update(self, instance, validated_data):
+        if "access_group" in validated_data:
+            user = permissions.get_request_user(self.context["request"])
+            if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
+                access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
+                if validated_data["access_group"] not in access_groups:
+                    raise serializers.ValidationError({"access_group": "Must be a group to which you belong."})
+
+        return super(FolderSerializer, self).update(instance, validated_data)
+
     class Meta:
         model = models.Folder
-        fields = ("id", "name", "path", "parent", "file_count", "length")
-        extra_kwargs = {field: {"read_only": True} for field in fields}
+        fields = ("id", "name", "path", "parent", "file_count", "length", "access_group")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field != "access_group"}
 
 
 # Album serializer

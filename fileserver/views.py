@@ -217,34 +217,31 @@ def face_view(request, *args, **kwargs):
 
 # File API, with filtering by folder/album, searching and pagination
 class FileViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.FileSerializer
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all().order_by("folder", "name")
-    filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
+    filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
     pagination_class = filters.CustomPagination
 
 
 # Folder API, with filtering by parent and searching
-class FolderViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
+class FolderViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FolderSerializer
+    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all().order_by("parent", "name")
-    filter_backends = (filters.BACKEND, filters.CustomSearchFilter)
+    filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
 
 
 # Album API
 class AlbumViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.AlbumSerializer
     queryset = models.Album.objects.all()
 
 
 # Album-File API (for adding/removing files from albums)
 class AlbumFileViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     queryset = models.AlbumFile.objects.all()
     serializer_class = serializers.AlbumFileSerializer
     filter_class = filters.AlbumFileFilter
@@ -252,15 +249,12 @@ class AlbumFileViewSet(viewsets.ModelViewSet):
 
 # Person API
 class PersonViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.PersonSerializer
-    http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     queryset = models.Person.objects.all()
 
 
 # Face API, with filtering by person and pagination
 class FaceViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
     queryset = models.Face.objects.all().order_by("-status", "uncertainty", "id")
@@ -270,22 +264,18 @@ class FaceViewSet(viewsets.ModelViewSet):
 
 # PersonGroup API
 class PersonGroupViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
-    http_method_names = list(filter(lambda n: n != "put", viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.PersonGroupSerializer
     queryset = models.PersonGroup.objects.all()
 
 
 # GeoTagArea API
 class GeoTagAreaViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.GeoTagAreaSerializer
     queryset = models.GeoTagArea.objects.all()
 
 
 # ScanFolder API, with filtering by parent
 class ScanFolderViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     serializer_class = serializers.ScanFolderSerializer
     filter_class = filters.ScanFolderFilter
     queryset = models.ScanFolder.objects.all()
@@ -293,7 +283,6 @@ class ScanFolderViewSet(viewsets.ReadOnlyModelViewSet):
 
 # Scan API, with filtering by parent and pagination
 class ScanViewSet(viewsets.ModelViewSet):
-    permission_classes = (permissions.FileserverPermission, )
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.ScanSerializer
     filter_class = filters.ScanFilter

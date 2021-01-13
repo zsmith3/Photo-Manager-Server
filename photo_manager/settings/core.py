@@ -87,7 +87,8 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer", "rest_framework_msgpack.renderers.MessagePackRenderer", "rest_framework.renderers.BrowsableAPIRenderer"),
     "DEFAULT_PARSER_CLASSES": ("rest_framework.parsers.JSONParser", "rest_framework_msgpack.parsers.MessagePackParser"),
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_jwt.authentication.JSONWebTokenAuthentication", ),
-    "DEFAULT_FILTER_BACKENDS": ("rest_framework_filters.backends.RestFrameworkFilterBackend", )
+    "DEFAULT_FILTER_BACKENDS": ("rest_framework_filters.backends.RestFrameworkFilterBackend", "fileserver.filters.PermissionFilter"),
+    "DEFAULT_PERMISSION_CLASSES": ("fileserver.membership.permissions.FileserverPermission", )
 }
 
 JWT_AUTH = {"JWT_EXPIRATION_DELTA": datetime.timedelta(365)}

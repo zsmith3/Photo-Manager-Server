@@ -1,5 +1,7 @@
 from . import models
-from django.core.exceptions import FieldError
+from .membership import permissions
+from .membership.models import AuthGroup
+from django.conf import settings
 import rest_framework_filters as filters
 from rest_framework import filters as drf_filters
 from rest_framework import pagination
@@ -7,6 +9,23 @@ from rest_framework import pagination
 from . import utils
 
 BACKEND = filters.backends.RestFrameworkFilterBackend
+
+
+# Return only models the user has permission to access
+class PermissionFilter(BACKEND):
+    def filter_queryset(self, request, queryset, view):
+        user = permissions.get_request_user(request)
+        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+            return queryset
+
+        access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
+
+        if queryset.model == models.File or queryset.model == models.Folder:
+            return queryset.filter(access_group__in=access_groups)
+        elif hasattr(queryset.model, "file"):
+            return queryset.filter(file__access_group__in=access_groups)
+        else:
+            return queryset
 
 
 # Filter albums by by ID(s) (used within FileFilter)

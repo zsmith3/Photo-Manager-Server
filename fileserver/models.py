@@ -24,7 +24,7 @@ from sklearn import neighbors
 
 # Local imports
 from . import scancrop, utils
-from .membership.models import *
+from .membership.models import AuthGroup, UserConfig
 
 # Allow very large images to be read
 Image.MAX_IMAGE_PIXELS = None
@@ -117,7 +117,7 @@ class BaseFolder(models.Model):
         if folder_qs.exists():
             folder = folder_qs.first()
         else:
-            folder = cls.objects.create(name=name, parent=parent)
+            folder = cls.objects.create(name=name, parent=parent, access_group=parent.access_group)
 
         # Recursively load folder contents
         folder.scan_filesystem()
@@ -166,6 +166,7 @@ class Folder(BaseFolder):
     file_count = models.PositiveIntegerField(default=0)
     length = models.PositiveBigIntegerField(default=0)
     path = models.TextField(default="")
+    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT)
 
     # Detect faces in files in folder
     def detect_faces(self):
@@ -316,6 +317,7 @@ class File(models.Model):
     notes = models.TextField(null=True)
     timestamp = models.DateTimeField(null=True)
     scanned_faces = models.BooleanField(default=False)
+    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT)
 
     width = models.PositiveIntegerField(null=True)
     height = models.PositiveIntegerField(null=True)
@@ -351,7 +353,7 @@ class File(models.Model):
         utils.log("Adding file to database: %s/%s" % (folder.name, full_name))
 
         # Create new file dictionary
-        new_file = {"folder": folder, "type": File.get_type(extension), "format": extension[1:]}
+        new_file = {"folder": folder, "type": File.get_type(extension), "format": extension[1:], "access_group": folder.access_group}
 
         # Get EXIF and mutagen data from file
         exif_data = File.get_exif(real_path)
