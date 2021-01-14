@@ -191,6 +191,15 @@ class Folder(BaseFolder):
         for file in files:
             file.detect_faces()
 
+    # Recursively update access group for all child files/folders
+    def update_access_group(self, access_group):
+        self.access_group = access_group
+        self.save()
+        folders = Folder.objects.filter(parent=self)
+        for child in folders:
+            child.update_access_group(access_group)
+        File.objects.filter(folder=self).update(access_group=access_group)
+
 
 # Model for representing root folders
 class RootFolder(models.Model):

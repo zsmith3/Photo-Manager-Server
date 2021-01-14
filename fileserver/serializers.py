@@ -53,6 +53,8 @@ class FileSerializer(serializers.ModelSerializer):
 
 # Folder serializer
 class FolderSerializer(serializers.ModelSerializer):
+    propagate_ag = serializers.BooleanField(write_only=True)
+
     def update(self, instance, validated_data):
         if "access_group" in validated_data:
             user = permissions.get_request_user(self.context["request"])
@@ -61,12 +63,16 @@ class FolderSerializer(serializers.ModelSerializer):
                 if validated_data["access_group"] not in access_groups:
                     raise serializers.ValidationError({"access_group": "Must be a group to which you belong."})
 
+            if "propagate_ag" in validated_data and validated_data["propagate_ag"]:
+                instance.update_access_group(validated_data.pop("access_group"))
+                validated_data.pop("propagate_ag")
+
         return super(FolderSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = models.Folder
-        fields = ("id", "name", "path", "parent", "file_count", "length", "access_group")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field != "access_group"}
+        fields = ("id", "name", "path", "parent", "file_count", "length", "access_group", "propagate_ag")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_group", "propagate_ag"]}
 
 
 # Album serializer
