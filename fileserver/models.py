@@ -166,7 +166,7 @@ class Folder(BaseFolder):
     file_count = models.PositiveIntegerField(default=0)
     length = models.PositiveBigIntegerField(default=0)
     path = models.TextField(default="")
-    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT)
+    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT, default=1)
 
     # Detect faces in files in folder
     def detect_faces(self):
