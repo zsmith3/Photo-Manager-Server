@@ -421,12 +421,7 @@ class File(models.Model):
                 new_file["timestamp"] = datetime.datetime.fromtimestamp(os.path.getmtime(real_path))
 
         # Get image dimensions
-        exif_width = utils.get_if_exist(exif_data, ["EXIF", "ExifImageWidth"])
-        exif_height = utils.get_if_exist(exif_data, ["EXIF", "ExifImageLength"])
-        if exif_width and exif_height:
-            new_file["width"] = exif_width
-            new_file["height"] = exif_height
-        elif new_file["type"] == "image":
+        if new_file["type"] == "image":
             image = Image.open(real_path)
             new_file["width"] = image.size[0]
             new_file["height"] = image.size[1]
