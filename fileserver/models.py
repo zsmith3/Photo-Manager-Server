@@ -79,7 +79,10 @@ class BaseFolder(models.Model):
 
         # Delete self if needed
         if not os.path.isdir(self.get_real_path()):
-            self.delete()
+            try:
+                self.delete()
+            except models.deletion.ProtectedError:
+                os.makedirs(self.get_real_path())
 
     # Recursively update cached properties (when database updated)
     def update_props(self):
