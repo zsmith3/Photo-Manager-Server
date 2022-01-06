@@ -21,9 +21,9 @@ class PermissionFilter(BACKEND):
         access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
 
         if queryset.model == models.File or queryset.model == models.Folder:
-            return queryset.filter(access_group__in=access_groups)
+            return queryset.filter(access_groups__in=access_groups)
         elif hasattr(queryset.model, "file"):
-            return queryset.filter(file__access_group__in=access_groups)
+            return queryset.filter(file__access_groups__in=access_groups)
         else:
             return queryset
 

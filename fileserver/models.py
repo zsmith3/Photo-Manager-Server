@@ -120,7 +120,9 @@ class BaseFolder(models.Model):
         if folder_qs.exists():
             folder = folder_qs.first()
         else:
-            folder = cls.objects.create(name=name, parent=parent, access_group=parent.access_group)
+            folder = cls.objects.create(name=name, parent=parent)
+            folder.access_groups.set(parent.access_groups.all())
+            folder.save()
 
         # Recursively load folder contents
         folder.scan_filesystem()
@@ -169,7 +171,7 @@ class Folder(BaseFolder):
     file_count = models.PositiveIntegerField(default=0)
     length = models.PositiveBigIntegerField(default=0)
     path = models.TextField(default="")
-    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT, default=1)
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
 
     # Detect faces in files in folder
     def detect_faces(self):
@@ -195,13 +197,21 @@ class Folder(BaseFolder):
             file.detect_faces()
 
     # Recursively update access group for all child files/folders
-    def update_access_group(self, access_group):
-        self.access_group = access_group
-        self.save()
-        folders = Folder.objects.filter(parent=self)
-        for child in folders:
-            child.update_access_group(access_group)
-        File.objects.filter(folder=self).update(access_group=access_group)
+    def update_access_groups(self, access_groups, user_groups):
+        try:
+            utils.log(f"Recursively updating access groups for folder: {self}")
+            if (self.access_groups.all() & user_groups).exists():
+                self.access_groups.set(access_groups)
+                self.save()
+            folders = Folder.objects.filter(parent=self)
+            for child in folders:
+                child.update_access_groups(access_groups, user_groups)
+            for file in File.objects.filter(folder=self).only("access_groups"):
+                if (file.access_groups.all() & user_groups).exists():
+                    file.access_groups.set(access_groups)
+            utils.log(f"Finished updating access groups for: {self}")
+        except Exception:
+            utils.log(traceback.format_exc())
 
 
 # Model for representing root folders
@@ -217,6 +227,7 @@ class RootFolder(models.Model):
     def post_create(cls, sender, instance, created, *args, **kwargs):
         if created:
             instance.folder = Folder.objects.create(name=instance.name)
+            instance.folder.access_groups.set([AuthGroup.objects.filter(id=1).first()])
             instance.save()
 
     # Full local filesystem path to folder
@@ -329,7 +340,7 @@ class File(models.Model):
     notes = models.TextField(null=True)
     timestamp = models.DateTimeField(null=True)
     scanned_faces = models.BooleanField(default=False)
-    access_group = models.ForeignKey(AuthGroup, related_name="+", on_delete=models.PROTECT)
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
 
     width = models.PositiveIntegerField(null=True)
     height = models.PositiveIntegerField(null=True)
@@ -365,7 +376,7 @@ class File(models.Model):
         utils.log("Adding file to database: %s/%s" % (folder.name, full_name))
 
         # Create new file dictionary
-        new_file = {"folder": folder, "type": File.get_type(extension), "format": extension[1:], "access_group": folder.access_group}
+        new_file = {"folder": folder, "type": File.get_type(extension), "format": extension[1:]}
 
         # Get EXIF and mutagen data from file
         exif_data = File.get_exif(real_path)
@@ -447,6 +458,8 @@ class File(models.Model):
 
         # Create new file object
         file = File.objects.create(**new_file)
+        file.access_groups.set(folder.access_groups.all())
+        file.save()
 
         # Get full path of new filename
         new_real_path = folder.get_real_path() + new_file["file_id"] + extension

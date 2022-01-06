@@ -3,6 +3,7 @@ from rest_framework import serializers
 from . import models
 from .membership import permissions
 from .membership.models import AuthGroup
+import threading
 
 
 # GeoTag serializer
@@ -16,14 +17,14 @@ class GeoTagSerializer(serializers.ModelSerializer):
 class FileSerializer(serializers.ModelSerializer):
     geotag = GeoTagSerializer(allow_null=True)
 
-    # Create new Geotag instance when given in nested update data
+    # Create new Geotag instance when given in nested update data, and validate access groups
     def update(self, instance, validated_data):
-        if "access_group" in validated_data:
+        if "access_groups" in validated_data:
             user = permissions.get_request_user(self.context["request"])
             if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
                 access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
-                if validated_data["access_group"] not in access_groups:
-                    raise serializers.ValidationError({"access_group": "Must be a group to which you belong."})
+                if not any(g in access_groups for g in validated_data["access_groups"]):
+                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
 
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
@@ -47,8 +48,8 @@ class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.File
         fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "notes", "timestamp", "width", "height", "orientation", "duration", "geotag",
-                  "access_group")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation", "access_group"]}
+                  "access_groups")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation", "access_groups"]}
 
 
 # Folder serializer
@@ -56,23 +57,26 @@ class FolderSerializer(serializers.ModelSerializer):
     propagate_ag = serializers.BooleanField(write_only=True)
 
     def update(self, instance, validated_data):
-        if "access_group" in validated_data:
+        if "access_groups" in validated_data:
             user = permissions.get_request_user(self.context["request"])
             if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
-                access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
-                if validated_data["access_group"] not in access_groups:
-                    raise serializers.ValidationError({"access_group": "Must be a group to which you belong."})
+                user_access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
+                if not any(g in user_access_groups for g in validated_data["access_groups"]):
+                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
+            else:
+                user_access_groups = AuthGroup.objects.all()
 
             if "propagate_ag" in validated_data and validated_data["propagate_ag"]:
-                instance.update_access_group(validated_data.pop("access_group"))
+                access_groups = validated_data.pop("access_groups")
+                threading.Thread(target=lambda: instance.update_access_groups(access_groups, user_access_groups)).start()
                 validated_data.pop("propagate_ag")
 
         return super(FolderSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = models.Folder
-        fields = ("id", "name", "path", "parent", "file_count", "length", "access_group", "propagate_ag")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_group", "propagate_ag"]}
+        fields = ("id", "name", "path", "parent", "file_count", "length", "access_groups", "propagate_ag")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_groups", "propagate_ag"]}
 
 
 # Album serializer
