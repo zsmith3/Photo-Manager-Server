@@ -12,4 +12,4 @@
 **/static/**
 
 # Logging
-python_log*.txt
+logs/**
