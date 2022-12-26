@@ -1,10 +1,12 @@
 from . import models
 from .membership import permissions
-from .membership.models import AuthGroup
 from django.conf import settings
 import rest_framework_filters as filters
 from rest_framework import filters as drf_filters
 from rest_framework import pagination
+
+import functools
+import operator
 
 from . import utils
 
@@ -14,11 +16,9 @@ BACKEND = filters.backends.RestFrameworkFilterBackend
 # Return only models the user has permission to access
 class PermissionFilter(BACKEND):
     def filter_queryset(self, request, queryset, view):
-        user = permissions.get_request_user(request)
+        access_groups, user = permissions.get_request_authgroups(request)
         if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
             return queryset
-
-        access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
 
         if queryset.model == models.File or queryset.model == models.Folder:
             return queryset.filter(access_groups__in=access_groups)
@@ -192,8 +192,9 @@ class CustomSearchFilter(drf_filters.SearchFilter):
 
         # Combine all file sets
         all_files = utils.get_full_set(all_file_sets)
+        all_files_qs = queryset.model.objects.filter(id__in=[file.id for file in all_files])
 
-        return all_files
+        return all_files_qs
 
 
 # Pagination class (with variable page size)

@@ -20,11 +20,11 @@ class FileSerializer(serializers.ModelSerializer):
     # Create new Geotag instance when given in nested update data, and validate access groups
     def update(self, instance, validated_data):
         if "access_groups" in validated_data:
-            user = permissions.get_request_user(self.context["request"])
-            if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
-                access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
-                if not any(g in access_groups for g in validated_data["access_groups"]):
-                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
+            access_groups, user = permissions.get_request_authgroups(self.context["request"])
+            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+                pass
+            elif not any(g in access_groups for g in validated_data["access_groups"]):
+                raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
 
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
@@ -58,17 +58,16 @@ class FolderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         if "access_groups" in validated_data:
-            user = permissions.get_request_user(self.context["request"])
-            if not (settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None):
-                user_access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
-                if not any(g in user_access_groups for g in validated_data["access_groups"]):
-                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
+            authgroups, user = permissions.get_request_authgroups(self.context["request"])
+            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+                authgroups = AuthGroup.objects.all()
             else:
-                user_access_groups = AuthGroup.objects.all()
+                if not any(g in authgroups for g in validated_data["access_groups"]):
+                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
 
             if "propagate_ag" in validated_data and validated_data["propagate_ag"]:
                 access_groups = validated_data.pop("access_groups")
-                threading.Thread(target=lambda: instance.update_access_groups(access_groups, user_access_groups)).start()
+                threading.Thread(target=lambda: instance.update_access_groups(access_groups, authgroups)).start()
                 validated_data.pop("propagate_ag")
 
         return super(FolderSerializer, self).update(instance, validated_data)
