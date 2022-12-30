@@ -1,12 +1,10 @@
+from os import access
 from . import models
 from .membership import permissions
 from django.conf import settings
 import rest_framework_filters as filters
 from rest_framework import filters as drf_filters
 from rest_framework import pagination
-
-import functools
-import operator
 
 from . import utils
 
@@ -17,13 +15,13 @@ BACKEND = filters.backends.RestFrameworkFilterBackend
 class PermissionFilter(BACKEND):
     def filter_queryset(self, request, queryset, view):
         access_groups, user = permissions.get_request_authgroups(request)
-        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and not access_groups.exists():
             return queryset
 
-        if queryset.model == models.File or queryset.model == models.Folder:
-            return queryset.filter(access_groups__in=access_groups)
+        if hasattr(queryset.model, "access_groups"):
+            return (queryset.filter(access_groups__in=access_groups) | queryset.filter(id=0)).distinct()
         elif hasattr(queryset.model, "file"):
-            return queryset.filter(file__access_groups__in=access_groups)
+            return queryset.filter(file__access_groups__in=access_groups).distinct()
         else:
             return queryset
 
@@ -118,7 +116,7 @@ class AlbumFileFilter(filters.FilterSet):
 
     def filter_album(self, qs, name, value):
         all_albums = [value] + list(value.get_children(True))
-        return qs.filter(album__in=all_albums)
+        return qs.filter(album__in=all_albums).distinct()
 
     class Meta:
         model = models.AlbumFile

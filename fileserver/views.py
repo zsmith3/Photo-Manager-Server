@@ -94,6 +94,7 @@ def image_view(request, *args, **kwargs):
 
     # Get file, ensure it exists and is an image
     file_qs = (models.Scan if is_scan else models.File).objects.filter(id=kwargs["file_id"])
+    file_qs = filters.PermissionFilter().filter_queryset(request, file_qs, None)
     if file_qs.exists():
         file = file_qs.first()
         if not os.path.isfile(file.get_real_path()):
@@ -158,6 +159,7 @@ def image_thumb_view(request, *args, **kwargs):
 
     # Get file, ensure it exists and is an image
     file_qs = (models.Scan if is_scan else models.File).objects.filter(id=kwargs["file_id"])
+    file_qs = filters.PermissionFilter().filter_queryset(request, file_qs, None)
     if file_qs.exists():
         file = file_qs.first()
         if not os.path.isfile(file.get_real_path()):
@@ -198,6 +200,7 @@ def face_view(request, *args, **kwargs):
 
     # Get face and ensure it exists
     face_qs = models.Face.objects.filter(id=kwargs["face_id"])
+    face_qs = filters.PermissionFilter().filter_queryset(request, face_qs, None)
     if face_qs.exists():
         face = face_qs.first()
 
@@ -238,6 +241,7 @@ class FolderViewSet(viewsets.ModelViewSet):
 class AlbumViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.AlbumSerializer
     queryset = models.Album.objects.all()
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
 
 
 # Album-File API (for adding/removing files from albums)
@@ -251,6 +255,7 @@ class AlbumFileViewSet(viewsets.ModelViewSet):
 class PersonViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.PersonSerializer
     queryset = models.Person.objects.all()
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
 
 
 # Face API, with filtering by person and pagination
@@ -258,6 +263,7 @@ class FaceViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "patch", "head", "options"]
     serializer_class = serializers.FaceSerializer
     queryset = models.Face.objects.all().order_by("-status", "uncertainty", "id")
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
     filter_class = filters.FaceFilter
     pagination_class = filters.CustomPagination
 
@@ -266,12 +272,14 @@ class FaceViewSet(viewsets.ModelViewSet):
 class PersonGroupViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.PersonGroupSerializer
     queryset = models.PersonGroup.objects.all()
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
 
 
 # GeoTagArea API
 class GeoTagAreaViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.GeoTagAreaSerializer
     queryset = models.GeoTagArea.objects.all()
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
 
 
 # ScanFolder API, with filtering by parent
@@ -279,12 +287,14 @@ class ScanFolderViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = serializers.ScanFolderSerializer
     filter_class = filters.ScanFolderFilter
     queryset = models.ScanFolder.objects.all()
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
 
 
 # Scan API, with filtering by parent and pagination
 class ScanViewSet(viewsets.ModelViewSet):
     http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     serializer_class = serializers.ScanSerializer
+    filter_backends = (filters.BACKEND, filters.PermissionFilter)
     filter_class = filters.ScanFilter
     queryset = models.Scan.objects.all()
     pagination_class = filters.CustomPagination

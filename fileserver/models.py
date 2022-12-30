@@ -155,6 +155,33 @@ class BaseFolder(models.Model):
         else:
             return files
 
+    # Recursively update access group for all child files/folders
+    def update_access_groups(self, access_groups, user_groups):
+        try:
+            utils.log(f"Recursively updating access groups for folder: {self}")
+            if (self.access_groups.all() & user_groups).exists():
+                self.access_groups.set(access_groups)
+                self.save()
+            folders = self.folder_cls().objects.filter(parent=self)
+            for child in folders:
+                child.update_access_groups(access_groups, user_groups)
+            for file in self.file_cls().objects.filter(folder=self).only("access_groups"):
+                if (file.access_groups.all() & user_groups).exists():
+                    file.access_groups.set(access_groups)
+            utils.log(f"Finished updating access groups for: {self}")
+        except Exception:
+            utils.log(traceback.format_exc())
+
+    # Recursively add new access groups to parents
+    def update_parent_access_groups(self, access_groups):
+        return
+        # NOTE this is not currently in use as may be complicated to implement correctly
+        if self.parent:
+            for group in access_groups:
+                if not self.parent.access_groups.filter(id=group.id).exists():
+                    self.parent.access_groups.add(group)
+            self.parent.update_parent_access_groups(access_groups)
+
 
 # Model for representing folders in virtual filesystem
 class Folder(BaseFolder):
@@ -195,23 +222,6 @@ class Folder(BaseFolder):
         files = File.objects.filter(folder=self)
         for file in files:
             file.detect_faces()
-
-    # Recursively update access group for all child files/folders
-    def update_access_groups(self, access_groups, user_groups):
-        try:
-            utils.log(f"Recursively updating access groups for folder: {self}")
-            if (self.access_groups.all() & user_groups).exists():
-                self.access_groups.set(access_groups)
-                self.save()
-            folders = Folder.objects.filter(parent=self)
-            for child in folders:
-                child.update_access_groups(access_groups, user_groups)
-            for file in File.objects.filter(folder=self).only("access_groups"):
-                if (file.access_groups.all() & user_groups).exists():
-                    file.access_groups.set(access_groups)
-            utils.log(f"Finished updating access groups for: {self}")
-        except Exception:
-            utils.log(traceback.format_exc())
 
 
 # Model for representing root folders
@@ -265,6 +275,7 @@ class Album(models.Model):
     name = models.TextField()
     parent = models.ForeignKey("Album", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
     files = models.ManyToManyField("File", through="AlbumFile")
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
     date_created = models.DateTimeField(auto_now_add=True)
 
     # Display name (path)
@@ -308,6 +319,32 @@ class Album(models.Model):
             album_file_qs = AlbumFile.objects.filter(album=self.parent, file=to_remove)
             album_file_qs.delete()
             self.parent.remove_from_parents(to_remove)
+
+    # Recursively update access groups for child albums and files
+    def update_access_groups(self, access_groups, user_groups):
+        try:
+            utils.log(f"Recursively updating access groups for album: {self}")
+            if (self.access_groups.all() & user_groups).exists():
+                self.access_groups.set(access_groups)
+                self.save()
+            albums = Album.objects.filter(parent=self)
+            for child in albums:
+                child.update_access_groups(access_groups, user_groups)
+            for file in self.files.all().only("access_groups"):
+                if (file.access_groups.all() & user_groups).exists():
+                    file.access_groups.set(access_groups)
+            utils.log(f"Finished updating access groups for: {self}")
+        except Exception:
+            utils.log(traceback.format_exc())
+
+    # Recursively add new access groups to parents
+    def update_parent_access_groups(self, access_groups):
+        return
+        if self.parent:
+            for group in access_groups:
+                if not self.parent.access_groups.filter(id=group.id).exists():
+                    self.parent.access_groups.add(group)
+            self.parent.update_parent_access_groups(access_groups)
 
 
 # Album-File relationship
@@ -655,6 +692,21 @@ class PersonGroup(models.Model):
     history = HistoricalRecords()
 
     name = models.TextField()
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
+
+    # Recursively update access groups for child albums and files
+    def update_access_groups(self, access_groups, user_groups):
+        try:
+            utils.log(f"Updating access groups for person group: {self}")
+            if (self.access_groups.all() & user_groups).exists():
+                self.access_groups.set(access_groups)
+                self.save()
+            for person in Person.objects.filter(group=self).only("access_groups"):
+                if (person.access_groups.all() & user_groups).exists():
+                    person.access_groups.set(access_groups)
+            utils.log(f"Finished updating access groups for: {self}")
+        except Exception:
+            utils.log(traceback.format_exc())
 
 
 # Person model to identify faces found in files
@@ -663,6 +715,7 @@ class Person(models.Model):
 
     full_name = models.TextField()
     group = models.ForeignKey(PersonGroup, on_delete=models.SET_DEFAULT, default=0, related_name="+")
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
     date_created = models.DateTimeField(auto_now_add=True)
 
     # Select largest confirmed face to use as thumbnail (None if no confirmed faces)
@@ -682,6 +735,13 @@ class Person(models.Model):
     # Get all faces (confirmed and unconfirmed)
     def get_faces(self):
         return Face.objects.filter(person=self, status__lt=4)
+
+    # Recursively add new access groups to parents
+    def update_parent_access_groups(self, access_groups):
+        return
+        for access_group in access_groups:
+            if not self.group.access_groups.filter(id=access_group.id).exists():
+                self.group.access_groups.add(access_group)
 
 
 # Update person/status fields on Face model when associated Person object is deleted
@@ -1065,6 +1125,7 @@ class ScanFolder(BaseFolder):
     parent = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+", null=True, blank=True)
     file_count = models.PositiveIntegerField(default=0)
     path = models.TextField(default="")
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
 
     # Generate all output folders
     def generate_output_tree(self, output_folder):
@@ -1086,6 +1147,7 @@ class Scan(models.Model):
     format = models.TextField(null=True)
     folder = models.ForeignKey("ScanFolder", on_delete=models.CASCADE, related_name="+")
     done_output = models.BooleanField(default=False)
+    access_groups = models.ManyToManyField(AuthGroup, related_name="+")
 
     width = models.PositiveIntegerField(null=True)
     height = models.PositiveIntegerField(null=True)

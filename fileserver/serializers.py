@@ -1,3 +1,4 @@
+from logging.config import valid_ident
 from django.conf import settings
 from rest_framework import serializers
 from . import models
@@ -13,19 +14,33 @@ class GeoTagSerializer(serializers.ModelSerializer):
         fields = ("id", "latitude", "longitude", "area")
 
 
+class AccessGroupSerializer(serializers.ModelSerializer):
+    def update(self, instance, validated_data):
+        if "access_groups" in validated_data:
+            authgroups, user = permissions.get_request_authgroups(self.context["request"])
+            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+                authgroups = AuthGroup.objects.all()
+            else:
+                if not any(g in authgroups for g in validated_data["access_groups"]):
+                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
+
+            if hasattr(instance, "update_parent_access_groups"):
+                instance.update_parent_access_groups(validated_data["access_groups"])
+
+            if "propagate_ag" in validated_data and validated_data["propagate_ag"]:
+                access_groups = validated_data.pop("access_groups")
+                threading.Thread(target=lambda: instance.update_access_groups(access_groups, authgroups)).start()
+                validated_data.pop("propagate_ag")
+
+        return super(AccessGroupSerializer, self).update(instance, validated_data)
+
+
 # File serializer (includes geotag data)
-class FileSerializer(serializers.ModelSerializer):
+class FileSerializer(AccessGroupSerializer):
     geotag = GeoTagSerializer(allow_null=True)
 
     # Create new Geotag instance when given in nested update data, and validate access groups
     def update(self, instance, validated_data):
-        if "access_groups" in validated_data:
-            access_groups, user = permissions.get_request_authgroups(self.context["request"])
-            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
-                pass
-            elif not any(g in access_groups for g in validated_data["access_groups"]):
-                raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
-
         if "geotag" in validated_data:
             geotag_data = validated_data.pop("geotag")
             if geotag_data is None:
@@ -53,24 +68,8 @@ class FileSerializer(serializers.ModelSerializer):
 
 
 # Folder serializer
-class FolderSerializer(serializers.ModelSerializer):
-    propagate_ag = serializers.BooleanField(write_only=True)
-
-    def update(self, instance, validated_data):
-        if "access_groups" in validated_data:
-            authgroups, user = permissions.get_request_authgroups(self.context["request"])
-            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
-                authgroups = AuthGroup.objects.all()
-            else:
-                if not any(g in authgroups for g in validated_data["access_groups"]):
-                    raise serializers.ValidationError({"access_groups": "Must contain at least one group to which you belong."})
-
-            if "propagate_ag" in validated_data and validated_data["propagate_ag"]:
-                access_groups = validated_data.pop("access_groups")
-                threading.Thread(target=lambda: instance.update_access_groups(access_groups, authgroups)).start()
-                validated_data.pop("propagate_ag")
-
-        return super(FolderSerializer, self).update(instance, validated_data)
+class FolderSerializer(AccessGroupSerializer):
+    propagate_ag = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = models.Folder
@@ -79,10 +78,12 @@ class FolderSerializer(serializers.ModelSerializer):
 
 
 # Album serializer
-class AlbumSerializer(serializers.ModelSerializer):
+class AlbumSerializer(AccessGroupSerializer):
+    propagate_ag = serializers.BooleanField(write_only=True, required=False)
+
     class Meta:
         model = models.Album
-        fields = ("id", "name", "file_count", "parent")
+        fields = ("id", "name", "file_count", "parent", "access_groups", "propagate_ag")
         extra_kwargs = {"file_count": {"read_only": True}}
 
 
@@ -90,6 +91,8 @@ class AlbumSerializer(serializers.ModelSerializer):
 class AlbumFileSerializer(serializers.ModelSerializer):
     # Remove from file from parent albums to avoid duplication
     def create(self, validated_data):
+        validated_data["file"].access_groups.set(validated_data["file"].access_groups.all() | validated_data["album"].access_groups.all())
+
         if not validated_data["album"].get_file_rels().filter(file=validated_data["file"]).exists():
             models.AlbumFile(album=validated_data["album"], file=validated_data["file"]).save()
             validated_data["album"].remove_from_parents(validated_data["file"])
@@ -101,14 +104,16 @@ class AlbumFileSerializer(serializers.ModelSerializer):
 
 
 # PersonGroup serializer
-class PersonGroupSerializer(serializers.ModelSerializer):
+class PersonGroupSerializer(AccessGroupSerializer):
+    propagate_ag = serializers.BooleanField(write_only=True, required=False)
+
     class Meta:
         model = models.PersonGroup
-        fields = ("id", "name")
+        fields = ("id", "name", "access_groups", "propagate_ag")
 
 
 # Person serializer (with face count and thumbnail ID)
-class PersonSerializer(serializers.ModelSerializer):
+class PersonSerializer(AccessGroupSerializer):
     face_count = serializers.SerializerMethodField()
     face_count_confirmed = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
@@ -124,7 +129,7 @@ class PersonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Person
-        fields = ("id", "full_name", "face_count", "face_count_confirmed", "thumbnail", "group")
+        fields = ("id", "full_name", "face_count", "face_count_confirmed", "thumbnail", "group", "access_groups")
         extra_kwargs = {field: {"read_only": True} for field in ["face_count", "face_count_confirmed", "thumbnail"]}
 
 
@@ -146,15 +151,17 @@ class GeoTagAreaSerializer(serializers.ModelSerializer):
 
 
 # ScanFolder serializer
-class ScanFolderSerializer(serializers.ModelSerializer):
+class ScanFolderSerializer(AccessGroupSerializer):
+    propagate_ag = serializers.BooleanField(write_only=True, required=False)
+
     class Meta:
         model = models.ScanFolder
-        fields = ("id", "name", "path", "parent", "file_count")
-        extra_kwargs = {field: {"read_only": True} for field in fields}
+        fields = ("id", "name", "path", "parent", "file_count", "access_groups", "propagate_ag")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_groups", "propagate_ag"]}
 
 
 # Scan serializer
-class ScanSerializer(serializers.ModelSerializer):
+class ScanSerializer(AccessGroupSerializer):
     lines = serializers.ListField(write_only=True)
     crop_options = serializers.DictField(write_only=True)
     confirm = serializers.BooleanField(write_only=True)
@@ -162,8 +169,8 @@ class ScanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Scan
-        fields = ("id", "name", "format", "folder", "width", "height", "orientation", "lines", "crop_options", "confirm", "rects")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["lines", "crop_options", "confirm"]}
+        fields = ("id", "name", "format", "folder", "width", "height", "orientation", "lines", "crop_options", "confirm", "rects", "access_groups")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["lines", "crop_options", "confirm", "access_groups"]}
 
     def validate(self, attrs):
         if "lines" in attrs:
