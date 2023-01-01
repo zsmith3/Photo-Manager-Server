@@ -39,6 +39,9 @@ class AccessGroupSerializer(serializers.ModelSerializer):
 class FileSerializer(AccessGroupSerializer):
     geotag = GeoTagSerializer(allow_null=True)
 
+    file_uploaded = serializers.ImageField(write_only=True)
+    upload_folder = serializers.IntegerField(write_only=True)
+
     # Create new Geotag instance when given in nested update data, and validate access groups
     def update(self, instance, validated_data):
         if "geotag" in validated_data:
@@ -63,8 +66,8 @@ class FileSerializer(AccessGroupSerializer):
     class Meta:
         model = models.File
         fields = ("id", "name", "path", "type", "format", "length", "is_starred", "is_deleted", "notes", "timestamp", "width", "height", "orientation", "duration", "geotag",
-                  "access_groups")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation", "access_groups"]}
+                  "access_groups", "file_uploaded", "upload_folder")
+        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["is_starred", "is_deleted", "notes", "geotag", "orientation", "access_groups", "file_uploaded"]}
 
 
 # Folder serializer

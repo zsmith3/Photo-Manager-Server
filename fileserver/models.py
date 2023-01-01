@@ -199,6 +199,7 @@ class Folder(BaseFolder):
     length = models.PositiveBigIntegerField(default=0)
     path = models.TextField(default="")
     access_groups = models.ManyToManyField(AuthGroup, related_name="+")
+    allow_upload = models.BooleanField(default=False)
 
     # Detect faces in files in folder
     def detect_faces(self):
