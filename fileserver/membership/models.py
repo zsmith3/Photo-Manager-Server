@@ -7,6 +7,7 @@ from django.contrib.auth.models import User, Group
 class AuthGroup(models.Model):
     group = models.OneToOneField(Group, related_name="auth", on_delete=models.CASCADE)
     token = models.TextField(max_length=64, default=secrets.token_hex)
+    can_link = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.group.name)
@@ -62,6 +63,14 @@ class UserConfig(models.Model):
 
     def __str__(self):
         return "Config for %s" % str(self.user)
+
+
+DEFAULT_USER_CONFIG = {
+    "desktop_thumb_scale": UserConfig.SETTINGS["thumb_scale"]["default"]["desktop"],
+    "mobile_thumb_scale": UserConfig.SETTINGS["thumb_scale"]["default"]["mobile"],
+    "desktop_page_size": UserConfig.SETTINGS["page_size"]["default"]["desktop"],
+    "mobile_page_size": UserConfig.SETTINGS["page_size"]["default"]["mobile"],
+}
 
 
 def create_user_config(sender, instance, created, **kwargs):

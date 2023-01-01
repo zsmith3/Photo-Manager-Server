@@ -18,20 +18,25 @@ class UserCreateAPIView(generics.CreateAPIView):
 # User Status API
 class UserStatusView(views.APIView):
     def get(self, request):
-        if request.user.is_authenticated and models.AuthGroup.user_is_auth(request.user):
+        authgroups, user = permissions.get_request_authgroups(request)
+        if authgroups.exists():
             fs_auth = True
         else:
             fs_auth = False
 
         data = {"authenticated": fs_auth}
         if fs_auth:
-            data["user"] = {"username": request.user.username, "full_name": request.user.first_name + " " + request.user.last_name}
-            data["config"] = serializers.UserConfigSerializer(models.UserConfig.objects.filter(user=request.user.id).first()).data
-            data["auth_groups"] = serializers.AuthGroupSerializer(models.AuthGroup.objects.filter(group__in=request.user.groups.all()), many=True).data
+            if user is not None:
+                data["user"] = {"username": request.user.username, "full_name": request.user.first_name + " " + request.user.last_name}
+                data["config"] = serializers.UserConfigSerializer(models.UserConfig.objects.filter(user=request.user.id).first()).data
+            else:
+                data["user"] = {"username": None, "full_name": "Anonymous User"}
+                data["config"] = models.DEFAULT_USER_CONFIG
+            data["auth_groups"] = serializers.AuthGroupSerializer(authgroups, many=True).data
         return response.Response(data, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
-        if not (request.user.is_authenticated and models.AuthGroup.user_is_auth(request.user)):
+        if not request.user.is_authenticated:
             return response.Response({"detail": "Not authenticated."}, status=status.HTTP_403_FORBIDDEN)
 
         if "config" not in request.data:
@@ -44,3 +49,5 @@ class UserStatusView(views.APIView):
         serializer.save()
 
         return self.get(request)
+
+# TODO test all this

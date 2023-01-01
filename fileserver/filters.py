@@ -1,6 +1,6 @@
+from os import access
 from . import models
 from .membership import permissions
-from .membership.models import AuthGroup
 from django.conf import settings
 import rest_framework_filters as filters
 from rest_framework import filters as drf_filters
@@ -14,16 +14,14 @@ BACKEND = filters.backends.RestFrameworkFilterBackend
 # Return only models the user has permission to access
 class PermissionFilter(BACKEND):
     def filter_queryset(self, request, queryset, view):
-        user = permissions.get_request_user(request)
-        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and user is None:
+        access_groups, user = permissions.get_request_authgroups(request)
+        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG and not access_groups.exists():
             return queryset
 
-        access_groups = AuthGroup.objects.filter(group__in=user.groups.all())
-
-        if queryset.model == models.File or queryset.model == models.Folder:
-            return queryset.filter(access_group__in=access_groups)
+        if hasattr(queryset.model, "access_groups"):
+            return (queryset.filter(access_groups__in=access_groups) | queryset.filter(id=0)).distinct()
         elif hasattr(queryset.model, "file"):
-            return queryset.filter(file__access_group__in=access_groups)
+            return queryset.filter(file__access_groups__in=access_groups).distinct()
         else:
             return queryset
 
@@ -118,7 +116,7 @@ class AlbumFileFilter(filters.FilterSet):
 
     def filter_album(self, qs, name, value):
         all_albums = [value] + list(value.get_children(True))
-        return qs.filter(album__in=all_albums)
+        return qs.filter(album__in=all_albums).distinct()
 
     class Meta:
         model = models.AlbumFile
@@ -192,8 +190,9 @@ class CustomSearchFilter(drf_filters.SearchFilter):
 
         # Combine all file sets
         all_files = utils.get_full_set(all_file_sets)
+        all_files_qs = queryset.model.objects.filter(id__in=[file.id for file in all_files])
 
-        return all_files
+        return all_files_qs
 
 
 # Pagination class (with variable page size)

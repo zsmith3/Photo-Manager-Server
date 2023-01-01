@@ -79,4 +79,4 @@ class AuthGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.AuthGroup
-        fields = ["id", "name"]
+        fields = ["id", "name", "token"]
