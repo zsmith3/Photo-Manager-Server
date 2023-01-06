@@ -76,7 +76,7 @@ class FolderSerializer(AccessGroupSerializer):
 
     class Meta:
         model = models.Folder
-        fields = ("id", "name", "path", "parent", "file_count", "length", "access_groups", "propagate_ag")
+        fields = ("id", "name", "path", "parent", "file_count", "length", "allow_upload", "access_groups", "propagate_ag")
         extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_groups", "propagate_ag"]}
 
 
