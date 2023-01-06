@@ -6,7 +6,9 @@ import os
 
 # Django imports
 from django import http
-from rest_framework import viewsets
+from rest_framework import viewsets, response, parsers
+from rest_framework_msgpack.parsers import MessagePackParser
+from django.core.files.storage import FileSystemStorage
 
 # Third-party imports
 import piexif
@@ -221,11 +223,36 @@ def face_view(request, *args, **kwargs):
 # File API, with filtering by folder/album, searching and pagination
 class FileViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FileSerializer
-    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
+    http_method_names = list(filter(lambda n: n not in ["put", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all().order_by("folder", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
     pagination_class = filters.CustomPagination
+    parser_classes = (parsers.JSONParser, MessagePackParser, parsers.MultiPartParser)
+
+    def create(self, request):
+        file_uploaded = request.FILES.get("file_uploaded")
+        if not file_uploaded:
+            return response.Response({"file_uploaded": "This field is required."}, 400)
+
+        if "folder" not in request.data or len(request.data["folder"]) != 1 or not request.data["folder"][0].isdigit():
+            return response.Response({"folder": "This field is required, and should be a single integer."}, 400)
+        folder_id = int(request.data["folder"][0])
+        folder_qs = models.Folder.objects.filter(id=folder_id)
+        folder_qs = filters.PermissionFilter().filter_queryset(request, folder_qs, None)
+        if not folder_qs.exists():
+            return response.Response({"folder": "Invalid folder ID provided."}, 400)
+        folder = folder_qs.first()
+        if not folder.allow_upload:
+            return response.Response({"folder": "Upload to this folder is not allowed."}, 403)
+        folder_path = folder.get_real_path().rstrip("/")
+
+        fs = FileSystemStorage(folder_path)
+        filename = fs.save(file_uploaded.name, file_uploaded)
+
+        file = models.File.from_fs(filename, folder)
+
+        return response.Response(serializers.FileSerializer(file).data)
 
 
 # Folder API, with filtering by parent and searching
