@@ -3,12 +3,15 @@ import datetime
 import io
 import json
 import os
+import secrets
+import zipfile
 
 # Django imports
 from django import http
-from rest_framework import viewsets, response, parsers
+from rest_framework import viewsets, response, parsers, views
 from rest_framework_msgpack.parsers import MessagePackParser
 from django.core.files.storage import FileSystemStorage
+from django.conf import settings
 
 # Third-party imports
 import piexif
@@ -218,6 +221,37 @@ def face_view(request, *args, **kwargs):
         return http.HttpResponse(thumb_bytes, content_type="image/jpeg")
     else:
         return http.HttpResponseNotFound()
+
+
+# Create zipped file for download
+class DownloadView(views.APIView):
+    def post(self, request, format=None):
+        # Ensure request is authorised
+        if not permissions.FileserverPermission().has_permission(request):
+            return http.HttpResponseForbidden()
+
+        def auth_filter(qs):
+            return filters.PermissionFilter().filter_queryset(request, qs, None)
+
+        file_qs = auth_filter(models.File.objects.filter(id__in=request.data["files"]))
+        folder_qs = auth_filter(models.Folder.objects.filter(id__in=request.data["folders"]))
+        album_qs = auth_filter(models.Album.objects.filter(id__in=request.data["albums"]))
+
+        token = secrets.token_urlsafe()
+        zip_fn = f"{token}.zip"
+        zip_path = os.path.join(settings.DOWNLOADS_DIR, zip_fn)
+
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            for file in file_qs:
+                file.add_to_zip(zipf)
+
+            for folder in folder_qs:
+                folder.add_to_zip(zipf, auth_filter)
+
+            for album in album_qs:
+                album.add_to_zip(zipf, auth_filter)
+
+        return response.Response({"url": f"{settings.DOWNLOADS_URL}{zip_fn}"})
 
 
 # Track total size of recent uploads

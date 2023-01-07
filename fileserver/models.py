@@ -224,6 +224,17 @@ class Folder(BaseFolder):
         for file in files:
             file.detect_faces()
 
+    # Recursively add (authorised) files/subfolders to zip file
+    def add_to_zip(self, zipf, auth_filter, path=""):
+        # zipf.mkdir(f"{path}{self.name}")
+        child_path = f"{path}{self.name}/"
+        files = auth_filter(self.get_files())
+        for file in files:
+            file.add_to_zip(zipf, child_path)
+        children = auth_filter(self.get_children(False))
+        for child in children:
+            child.add_to_zip(zipf, auth_filter, child_path)
+
 
 # Model for representing root folders
 class RootFolder(models.Model):
@@ -346,6 +357,17 @@ class Album(models.Model):
                 if not self.parent.access_groups.filter(id=group.id).exists():
                     self.parent.access_groups.add(group)
             self.parent.update_parent_access_groups(access_groups)
+
+    # Recursively add (authorised) files/subalbums to zip file
+    def add_to_zip(self, zipf, auth_filter, path=""):
+        # zipf.mkdir(f"{path}{self.name}")
+        child_path = f"{path}{self.name}/"
+        files = auth_filter(self.files.all())
+        for file in files:
+            file.add_to_zip(zipf, child_path)
+        children = auth_filter(self.get_children(False))
+        for child in children:
+            child.add_to_zip(zipf, auth_filter, child_path)
 
 
 # Album-File relationship
@@ -686,6 +708,10 @@ class File(models.Model):
         self.save()
 
         utils.log("Detected %s faces in file: %s" % (len(faces), str(self)))
+
+    # Write file to zip, in the folder specified by `path`
+    def add_to_zip(self, zipf, path=""):
+        zipf.write(self.get_real_path(), f"{path}{self.name}.{self.format}")
 
 
 # Category model for people

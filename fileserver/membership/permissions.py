@@ -40,7 +40,6 @@ def getLinkPermissions(allowed_methods):
     class LinkPermission(permissions.BasePermission):
         def has_permission(self, request, view=None):
             authgroups, user = get_request_authgroups(request)
-            print(authgroups, user, request.GET)
 
             if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
                 return True

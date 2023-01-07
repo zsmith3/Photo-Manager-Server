@@ -30,6 +30,7 @@ router.register("scans", views.ScanViewSet, basename="scans")
 urlpatterns = [
     path("api/membership", include(urls)),
     path("api/", include(router.urls)),
+    path("api/download/", views.DownloadView.as_view()),
     path("api/images/faces/<int:face_id>/", views.face_view),
 ] + sum(([
     path(f"api/images/{imgtype}<int:file_id>/thumbnail/", views.image_thumb_view),
