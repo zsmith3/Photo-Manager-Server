@@ -35,18 +35,25 @@ def get_request_authgroups(request):
     return auth_groups, user
 
 
-# Permission class for fileserver API access
-class FileserverPermission(permissions.BasePermission):
-    def has_permission(self, request, view=None):
-        authgroups, user = get_request_authgroups(request)
+# Permission class for fileserver access, with customisable access for non-admins
+def getLinkPermissions(allowed_methods):
+    class LinkPermission(permissions.BasePermission):
+        def has_permission(self, request, view=None):
+            authgroups, user = get_request_authgroups(request)
+            print(authgroups, user, request.GET)
 
-        if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
-            return True
+            if settings.DEBUG and not settings.USE_AUTH_IN_DEBUG:
+                return True
 
-        if request.method in permissions.SAFE_METHODS:
-            return authgroups.exists()
+            if request.method in permissions.SAFE_METHODS or request.method in allowed_methods:
+                return authgroups.exists()
 
-        if user is not None:
-            return models.AuthGroup.user_is_admin(user)
-        else:
-            return False
+            if user is not None:
+                return models.AuthGroup.user_is_admin(user)
+            else:
+                return False
+
+    return LinkPermission
+
+
+FileserverPermission = getLinkPermissions([])

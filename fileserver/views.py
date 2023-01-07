@@ -220,24 +220,35 @@ def face_view(request, *args, **kwargs):
         return http.HttpResponseNotFound()
 
 
+# Track total size of recent uploads
+# this feels hacky
+all_upload_sizes = []
+
+
 # File API, with filtering by folder/album, searching and pagination
 class FileViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FileSerializer
-    http_method_names = list(filter(lambda n: n not in ["put", "delete"], viewsets.ModelViewSet.http_method_names))
+    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all().order_by("folder", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
     pagination_class = filters.CustomPagination
     parser_classes = (parsers.JSONParser, MessagePackParser, parsers.MultiPartParser)
+    permission_classes = (permissions.getLinkPermissions(["POST"]),)
 
     def create(self, request):
         file_uploaded = request.FILES.get("file_uploaded")
         if not file_uploaded:
             return response.Response({"file_uploaded": "This field is required."}, 400)
+        if file_uploaded.size > 50 * 1024 * 1024:
+            return response.Response({"file_uploaded": "Max file size 50MB."}, 400)
+        recent_upload_size = sum([t[1] for t in all_upload_sizes if (datetime.datetime.now() - t[0]).total_seconds() < 24 * 60 * 60])
+        if recent_upload_size + file_uploaded.size > 1024 ** 3:
+            return response.Response({"file_uploaded": "Max total upload size 1GB per 24 hours."}, 400)
 
-        if "folder" not in request.data or len(request.data["folder"]) != 1 or not request.data["folder"][0].isdigit():
+        if "folder" not in request.data or not request.data["folder"].isdigit():
             return response.Response({"folder": "This field is required, and should be a single integer."}, 400)
-        folder_id = int(request.data["folder"][0])
+        folder_id = int(request.data["folder"])
         folder_qs = models.Folder.objects.filter(id=folder_id)
         folder_qs = filters.PermissionFilter().filter_queryset(request, folder_qs, None)
         if not folder_qs.exists():
@@ -247,6 +258,7 @@ class FileViewSet(viewsets.ModelViewSet):
             return response.Response({"folder": "Upload to this folder is not allowed."}, 403)
         folder_path = folder.get_real_path().rstrip("/")
 
+        all_upload_sizes.append((datetime.datetime.now(), file_uploaded.size))
         fs = FileSystemStorage(folder_path)
         filename = fs.save(file_uploaded.name, file_uploaded)
 
