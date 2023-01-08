@@ -122,6 +122,8 @@ class BaseFolder(models.Model):
         else:
             folder = cls.objects.create(name=name, parent=parent)
             folder.access_groups.set(parent.access_groups.all())
+            if cls.__name__ == "Folder":
+                folder.allow_upload = parent.allow_upload
             folder.save()
 
         # Recursively load folder contents
@@ -151,7 +153,7 @@ class BaseFolder(models.Model):
 
         files = queryset.filter(folder=self)
         if include_subfolders:
-            return functools.reduce(operator.or_, (child.get_files() for child in self.get_children(True)), files)
+            return functools.reduce(operator.or_, (child.get_files(True, queryset) for child in self.get_children(True)), files)
         else:
             return files
 
@@ -234,6 +236,15 @@ class Folder(BaseFolder):
         children = auth_filter(self.get_children(False))
         for child in children:
             child.add_to_zip(zipf, auth_filter, child_path)
+
+    # Create a child folder within this folder
+    def create_child(self, name):
+        if ".." in name or "/" in name:
+            raise ValueError("New folder name contains forbidden characters.")
+        real_path = self.get_real_path()
+        new_path = os.path.join(real_path, name)
+        os.mkdir(new_path)
+        return Folder.from_fs(name, self)
 
 
 # Model for representing root folders

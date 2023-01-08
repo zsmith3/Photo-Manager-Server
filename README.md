@@ -25,6 +25,7 @@ This is the Django-based server for my photo management system. See [Photo-Manag
 		}
 	}
 	```
+	When a user downloads a file, a .zip file is created in `DOWNLOADS_DIR`, which should then be hosted by a web server at `DOWNLOADS_URL` - both of these settings must be specified for downloads to work.
 5) Now perform database migrations:
 	- `python manage.py makemigrations`
 	- `python manage.py makemigrations fileserver`

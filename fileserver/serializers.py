@@ -74,10 +74,26 @@ class FileSerializer(AccessGroupSerializer):
 class FolderSerializer(AccessGroupSerializer):
     propagate_ag = serializers.BooleanField(write_only=True, required=False)
 
+    # Prevent name and parent fields from being edited on existing folders
+    def update(self, instance, validated_data):
+        validated_data.pop("parent", None)
+        validated_data.pop("name", None)
+        return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        parent = validated_data.pop("parent")
+        name = validated_data.pop("name")
+
+        if not parent.allow_upload:
+            raise serializers.ValidationError({"parent": "Folder must allow uploads to create subfolder."})
+
+        new_folder = parent.create_child(name)
+        return new_folder
+
     class Meta:
         model = models.Folder
         fields = ("id", "name", "path", "parent", "file_count", "length", "allow_upload", "access_groups", "propagate_ag")
-        extra_kwargs = {field: {"read_only": True} for field in fields if field not in ["access_groups", "propagate_ag"]}
+        extra_kwargs = {**{field: {"read_only": True} for field in fields if field not in ["name", "parent", "access_groups", "propagate_ag"]}, "access_groups": {"required": False}}
 
 
 # Album serializer

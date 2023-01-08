@@ -322,7 +322,7 @@ class FileViewSet(viewsets.ModelViewSet):
 # Folder API, with filtering by parent and searching
 class FolderViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FolderSerializer
-    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
+    http_method_names = list(filter(lambda n: n not in ["put", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FolderFilter
     queryset = models.Folder.objects.all().order_by("parent", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
