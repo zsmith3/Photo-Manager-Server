@@ -280,7 +280,7 @@ all_upload_sizes = []
 # File API, with filtering by folder/album, searching and pagination
 class FileViewSet(viewsets.ModelViewSet):
     serializer_class = serializers.FileSerializer
-    http_method_names = list(filter(lambda n: n not in ["put", "post", "delete"], viewsets.ModelViewSet.http_method_names))
+    http_method_names = list(filter(lambda n: n not in ["put", "delete"], viewsets.ModelViewSet.http_method_names))
     filter_class = filters.FileFilter
     queryset = models.File.objects.all().order_by("folder", "name")
     filter_backends = (filters.BACKEND, filters.CustomSearchFilter, filters.PermissionFilter)
