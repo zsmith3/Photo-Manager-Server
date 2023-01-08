@@ -223,6 +223,11 @@ def face_view(request, *args, **kwargs):
         return http.HttpResponseNotFound()
 
 
+# Track total size of recent downloads
+# this feels hacky
+all_download_sizes = []
+
+
 # Create zipped file for download
 class DownloadView(views.APIView):
     def post(self, request, format=None):
@@ -237,9 +242,20 @@ class DownloadView(views.APIView):
         folder_qs = auth_filter(models.Folder.objects.filter(id__in=request.data["folders"]))
         album_qs = auth_filter(models.Album.objects.filter(id__in=request.data["albums"]))
 
+        recent_download_size = sum([t[1] for t in all_download_sizes if (datetime.datetime.now() - t[0]).total_seconds() < 24 * 60 * 60])
+        total_size = sum([file.length for file in file_qs]) + sum([folder.length for folder in folder_qs]) + sum([file.length for album in album_qs for file in album.get_files()])
+        if recent_download_size + total_size > 20 * 1024 ** 3:
+            return response.Response({"size_error": "Max total download size 20GB per 24 hours."}, 400)
+
+        date = datetime.datetime.now().strftime("%Y%m%d")
         token = secrets.token_urlsafe()
-        zip_fn = f"{token}.zip"
+        zip_fn = f"{date}-{token}.zip"
         zip_path = os.path.join(settings.DOWNLOADS_DIR, zip_fn)
+
+        for fn in os.listdir(settings.DOWNLOADS_DIR):
+            fn_date = fn[:8]
+            if fn_date != date:
+                os.remove(os.path.join(settings.DOWNLOADS_DIR, fn))
 
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for file in file_qs:
@@ -250,6 +266,8 @@ class DownloadView(views.APIView):
 
             for album in album_qs:
                 album.add_to_zip(zipf, auth_filter)
+
+        all_download_sizes.append((datetime.datetime.now(), total_size))
 
         return response.Response({"url": f"{settings.DOWNLOADS_URL}{zip_fn}"})
 
