@@ -244,7 +244,17 @@ class Folder(BaseFolder):
         real_path = self.get_real_path()
         new_path = os.path.join(real_path, name)
         os.mkdir(new_path)
-        return Folder.from_fs(name, self)
+        new_folder = Folder.from_fs(name, self)
+        new_folder.path = self.path + name.strip("/") + "/"
+        new_folder.save()
+        return new_folder
+
+    # Recursively (upwards) update file count/size on user file upload
+    def add_file_update_props(self, file_size):
+        self.file_count += 1
+        self.length += file_size
+        if self.parent is not None:
+            self.parent.add_file_update_props(file_size)
 
 
 # Model for representing root folders

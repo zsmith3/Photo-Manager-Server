@@ -316,6 +316,8 @@ class FileViewSet(viewsets.ModelViewSet):
 
         file = models.File.from_fs(filename, folder)
 
+        folder.add_file_update_props(file.length)
+
         return response.Response(serializers.FileSerializer(file).data)
 
 
